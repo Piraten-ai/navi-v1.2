@@ -1,0 +1,203 @@
+﻿# Full development stack (PC)
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: aads-backend-dev
+    ports:
+      - "8001:8000"
+    env_file:
+      - ${BACKEND_ENV_FILE:-./config/backend.env.dev}
+    environment:
+      - VOICE_ENABLED=true
+      - PIPER_VOICE_MODEL=/app/models/piper/en_US-lessac-medium.onnx
+      - WHISPER_MODEL_SIZE=tiny.en
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/tests:/app/tests
+      - ./backend/conftest.py:/app/conftest.py
+      - ./backend/pytest.ini:/app/pytest.ini
+      - ./logs:/app/logs
+      - ./backend/data:/app/data
+      - ./models/piper:/app/models/piper:ro
+      - ./audio:/app/audio:ro
+    depends_on:
+      - postgres
+      - influxdb
+      - redis
+      - minio
+      - navi
+      - signalk
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: aads-frontend-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8001
+      - VITE_WS_URL=ws://localhost:8001/ws
+      - VITE_SIGNALK_HOST=http://localhost:3001
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: aads-postgres-dev
+    environment:
+      - POSTGRES_DB=aads
+      - POSTGRES_USER=aads
+      - POSTGRES_PASSWORD=aads_secure_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: aads-influxdb-dev
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=aads
+      - DOCKER_INFLUXDB_INIT_PASSWORD=aads_influx_pass
+      - DOCKER_INFLUXDB_INIT_ORG=aads
+      - DOCKER_INFLUXDB_INIT_BUCKET=aads_metrics
+      - DOCKER_INFLUXDB_INIT_RETENTION=7d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=aads_influx_token
+    volumes:
+      - influxdb_data_dev:/var/lib/influxdb2
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: aads-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data_dev:/data
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: aads-minio-dev
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data_dev:/data
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  navi:
+    image: ollama/ollama:latest
+    container_name: aads-navi-dev
+    command: ["serve"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_dev_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-mistral}
+      - OLLAMA_NUM_PARALLEL=1
+      - OLLAMA_MAX_LOADED_MODELS=1
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: aads-ollama-pull
+    command: ["pull", "${OLLAMA_MODEL:-mistral}"]
+    environment:
+      - OLLAMA_HOST=http://navi:11434
+    volumes:
+      - ollama_dev_data:/root/.ollama
+    restart: "no"
+    depends_on:
+      - navi
+    networks:
+      - aads-network
+
+  signalk:
+    image: signalk/signalk-server:latest
+    container_name: aads-signalk-dev
+    ports:
+      - "3001:3000"
+      - "10332:10332/udp"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - signalk_data_dev:/root/.signalk
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  simulators:
+    image: python:3.11-slim
+    container_name: aads-simulators
+    command: sh -c "pip install -q websockets && python /sim/run_simulators.py"
+    environment:
+      - SIGNALK_WS_URL=ws://signalk:3000/signalk/v1/stream
+      - BRIDGE_URL=http://backend:8000/api/v1/bridge/analog
+      - SIM_INTERVAL=1.0
+    volumes:
+      - ./scripts/sim/simulators:/sim
+    depends_on:
+      - backend
+      - signalk
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+volumes:
+  postgres_data_dev:
+    driver: local
+  influxdb_data_dev:
+    driver: local
+  redis_data_dev:
+    driver: local
+  minio_data_dev:
+    driver: local
+  ollama_dev_data:
+    driver: local
+  signalk_data_dev:
+    driver: local
+
+networks:
+  aads-network:
+    driver: bridge

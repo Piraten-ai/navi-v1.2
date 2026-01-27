@@ -1,0 +1,14 @@
+[Unit]
+Description=AADS Offline Tileserver (MBTiles)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/aads/frontend-qt/tileserver
+ExecStart=/usr/bin/docker compose -f /opt/aads/frontend-qt/tileserver/docker-compose.tiles.yml up -d
+ExecStop=/usr/bin/docker compose -f /opt/aads/frontend-qt/tileserver/docker-compose.tiles.yml down
+
+[Install]
+WantedBy=multi-user.target

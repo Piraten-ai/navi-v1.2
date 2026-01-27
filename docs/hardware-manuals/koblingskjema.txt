@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AADS Koblingsskjema v4.1 - Med GPIO Breakout</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0; /* Slate 200 */
+        }
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .wire {
+            transition: all 0.3s ease;
+        }
+        .wire:hover {
+            stroke-width: 4;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));
+            cursor: pointer;
+        }
+        .component-box {
+            backdrop-filter: blur(8px);
+            transition: transform 0.2s;
+        }
+        .component-box:hover {
+            transform: scale(1.02);
+            border-color: #38bdf8; /* Sky 400 */
+        }
+        /* Ribbon Cable Pattern */
+        .ribbon-cable {
+            stroke: #64748b;
+            stroke-width: 20;
+            stroke-dasharray: 2, 1;
+            opacity: 0.6;
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+
+    <!-- Header -->
+    <header class="mb-8 border-b border-slate-700 pb-4 flex justify-between items-end">
+        <div>
+            <h1 class="text-3xl font-bold text-sky-400 mb-2">AADS Koblingsskjema</h1>
+            <p class="text-slate-400 text-sm">Systemversjon 4.1 • Inkluderer GPIO Breakout</p>
+        </div>
+        <div class="hidden md:block text-right text-xs text-slate-500">
+            <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 bg-red-500 rounded-full inline-block"></span> Strøm (Power)</div>
+            <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 bg-blue-500 rounded-full inline-block"></span> Data (USB/Eth)</div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 bg-yellow-500 rounded-full inline-block"></span> Sensor Signal</div>
+        </div>
+    </header>
+
+    <main class="relative w-full overflow-x-auto bg-slate-900 rounded-xl border border-slate-700 shadow-2xl p-4">
+        <!-- SVG Canvas for Wiring -->
+        <div class="relative min-w-[1000px] min-h-[900px]">
+            
+            <svg id="wiring-svg" class="absolute top-0 left-0 w-full h-full pointer-events-none z-10" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="arrowhead-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+                    </marker>
+                    <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
+                    </marker>
+                    <marker id="arrowhead-yellow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#eab308" />
+                    </marker>
+                </defs>
+                
+                <!-- Wires will be drawn here -->
+                
+                <!-- POWER LINES -->
+                <!-- Wall to Jetson -->
+                <path d="M 50,150 C 100,150 100,150 140,150" stroke="#ef4444" stroke-width="3" fill="none" marker-end="url(#arrowhead-red)" class="wire" opacity="0.8"/>
+                <!-- Wall to RPi -->
+                <path d="M 50,450 C 100,450 100,450 140,450" stroke="#ef4444" stroke-width="3" fill="none" marker-end="url(#arrowhead-red)" class="wire" opacity="0.8"/>
+                <!-- RPi to Arduino (USB Power) -->
+                <path d="M 450,480 C 500,480 500,480 540,480" stroke="#ef4444" stroke-width="2" stroke-dasharray="5,5" fill="none" class="wire" />
+                
+                <!-- DATA LINES -->
+                <!-- Jetson to RPi (Ethernet) -->
+                <path d="M 300,200 C 300,300 300,300 300,390" stroke="#3b82f6" stroke-width="4" fill="none" class="wire" />
+                <!-- RPi to Screen (HDMI/USB) -->
+                <path d="M 450,420 C 500,420 500,100 680,100" stroke="#8b5cf6" stroke-width="3" fill="none" class="wire" />
+                <!-- RPi to Arduino (USB Serial) -->
+                <path d="M 450,500 C 500,500 500,500 540,500" stroke="#3b82f6" stroke-width="3" fill="none" class="wire" />
+
+                <!-- RIBBON CABLE (GPIO Breakout) -->
+                <path d="M 300,610 C 300,650 300,650 300,700" stroke="#94a3b8" stroke-width="24" fill="none" class="wire opacity-50" />
+                <path d="M 300,610 C 300,650 300,650 300,700" stroke="#475569" stroke-width="24" stroke-dasharray="2" fill="none" class="wire opacity-30" />
+
+                <!-- SENSOR LINES (Complex) -->
+                <!-- A0 Flame -->
+                <path d="M 850,380 L 900,380" stroke="#eab308" stroke-width="2" fill="none" class="wire" />
+                <!-- A1 Mic -->
+                <path d="M 850,410 L 900,410" stroke="#eab308" stroke-width="2" fill="none" class="wire" />
+                <!-- A2 Pulse -->
+                <path d="M 850,440 L 900,440" stroke="#eab308" stroke-width="2" fill="none" class="wire" />
+                <!-- A3 Vib -->
+                <path d="M 850,470 L 900,470" stroke="#eab308" stroke-width="2" fill="none" class="wire" />
+                
+                <!-- D2 Ultra -->
+                <path d="M 850,530 L 900,530" stroke="#eab308" stroke-width="2" fill="none" class="wire" />
+                <!-- D3 Tilt -->
+                <path d="M 850,560 L 900,560" stroke="#eab308" stroke-width="2" fill="none" class="wire" />
+                <!-- D4 Hit -->
+                <path d="M 850,590 L 900,590" stroke="#eab308" stroke-width="2" fill="none" class="wire" />
+                <!-- D5 Obstacle -->
+                <path d="M 850,620 L 900,620" stroke="#eab308" stroke-width="2" fill="none" class="wire" />
+                <!-- D6 Touch -->
+                <path d="M 850,650 L 900,650" stroke="#eab308" stroke-width="2" fill="none" class="wire" />
+                <!-- D7 Buzzer -->
+                <path d="M 850,680 L 900,680" stroke="#10b981" stroke-width="2" fill="none" class="wire" /> <!-- Green for Output -->
+                <!-- D8 Laser -->
+                <path d="M 850,710 L 900,710" stroke="#10b981" stroke-width="2" fill="none" class="wire" /> <!-- Green for Output -->
+                
+                <!-- I2C -->
+                <path d="M 695,760 L 695,800" stroke="#ec4899" stroke-width="2" fill="none" class="wire" />
+
+            </svg>
+
+            <!-- 1. POWER SOURCE -->
+            <div class="absolute top-[100px] left-[10px] w-[40px] h-[500px] bg-slate-800 rounded-l border-r-4 border-slate-600 flex flex-col justify-between py-12 items-center">
+                <div class="text-xs text-slate-400 rotate-[-90deg] whitespace-nowrap">VEGGSTRØM (230V)</div>
+            </div>
+
+            <!-- 2. JETSON ORIN NANO -->
+            <div class="absolute top-[80px] left-[140px] w-[320px] h-[200px] bg-slate-800/90 border border-green-500/50 rounded-lg p-4 shadow-lg component-box z-20">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold text-green-400">NVIDIA Jetson Orin Nano</h3>
+                    <span class="text-[10px] bg-green-900 text-green-100 px-1 rounded">Hjernen (AI)</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-xs text-slate-300">
+                    <div class="col-span-2 bg-slate-900 p-2 rounded border border-slate-700">
+                        <span class="text-red-400">⚡ DC Jack:</span> 9-19V (3A+)
+                        <div class="text-[10px] text-slate-500 mt-1">Egen strømforsyning nødvendig</div>
+                    </div>
+                    <div class="bg-slate-900 p-2 rounded border border-slate-700 relative">
+                        <span class="text-blue-400">🌐 Ethernet</span>
+                        <div class="absolute bottom-[-25px] left-1/2 w-1 h-4 bg-blue-500"></div> <!-- Wire stub -->
+                    </div>
+                    <div class="bg-slate-900 p-2 rounded border border-slate-700 opacity-50">
+                        <span>USB (Ledig)</span>
+                    </div>
+                </div>
+                <div class="mt-4 text-[10px] text-slate-500">
+                    Kjører "headless" (ingen skjerm). Sender inferensdata over nettverk.
+                </div>
+            </div>
+
+            <!-- 3. RASPBERRY PI 4 -->
+            <div class="absolute top-[390px] left-[140px] w-[320px] h-[220px] bg-slate-800/90 border border-red-500/50 rounded-lg p-4 shadow-lg component-box z-20">
+                <div class="flex justify-between items-start mb-2">
+                    <h3 class="font-bold text-red-400">Raspberry Pi 4 Model B</h3>
+                    <span class="text-[10px] bg-red-900 text-red-100 px-1 rounded">Frontend (GUI)</span>
+                </div>
+                
+                <div class="absolute top-[-10px] left-[140px] w-4 h-4 bg-blue-500 rounded-full animate-pulse"></div> <!-- Connection Point Eth -->
+
+                <div class="grid grid-cols-2 gap-2 text-xs text-slate-300">
+                    <div class="col-span-2 bg-slate-900 p-2 rounded border border-slate-700">
+                        <span class="text-red-400">⚡ USB-C Power:</span> 5.1V (3A)
+                    </div>
+                    <div class="bg-slate-900 p-2 rounded border border-slate-700 relative">
+                        <span class="text-purple-400">HDMI / DSI</span>
+                        <div class="text-[10px] text-slate-500">Til skjerm</div>
+                        <div class="absolute right-[-10px] top-1/2 h-1 w-4 bg-purple-500"></div>
+                    </div>
+                    <div class="bg-slate-900 p-2 rounded border border-slate-700 relative">
+                        <span class="text-blue-400">USB-A (x4)</span>
+                        <div class="text-[10px] text-slate-500">Til Arduino + Touch</div>
+                        <div class="absolute right-[-10px] top-1/2 h-1 w-4 bg-blue-500"></div>
+                    </div>
+                </div>
+                <!-- Ribbon Cable Stub -->
+                <div class="absolute bottom-[-10px] left-1/2 transform -translate-x-1/2 w-8 h-4 bg-slate-600 rounded-b"></div>
+            </div>
+
+            <!-- 6. GPIO BREAKOUT BOARD -->
+            <div class="absolute top-[700px] left-[200px] w-[200px] h-[100px] bg-slate-800/90 border border-slate-500 rounded-lg p-4 shadow-lg component-box z-20">
+                <div class="flex flex-col items-center justify-center h-full">
+                    <h3 class="font-bold text-slate-300 text-sm mb-1">GPIO Breakout Board</h3>
+                    <div class="w-full h-2 bg-slate-600 rounded mb-2"></div>
+                    <div class="grid grid-cols-10 gap-1 w-full">
+                        <!-- Tiny dots to simulate breadboard/pins -->
+                        <div class="w-1 h-1 bg-slate-500 rounded-full"></div><div class="w-1 h-1 bg-slate-500 rounded-full"></div>
+                        <div class="w-1 h-1 bg-slate-500 rounded-full"></div><div class="w-1 h-1 bg-slate-500 rounded-full"></div>
+                        <div class="w-1 h-1 bg-slate-500 rounded-full"></div><div class="w-1 h-1 bg-slate-500 rounded-full"></div>
+                        <div class="w-1 h-1 bg-slate-500 rounded-full"></div><div class="w-1 h-1 bg-slate-500 rounded-full"></div>
+                        <div class="w-1 h-1 bg-slate-500 rounded-full"></div><div class="w-1 h-1 bg-slate-500 rounded-full"></div>
+                    </div>
+                    <p class="text-[9px] text-slate-500 mt-2">Koblet til RPi 40-pin header</p>
+                </div>
+            </div>
+
+            <!-- 4. TOUCH SCREEN -->
+            <div class="absolute top-[50px] left-[680px] w-[200px] h-[150px] bg-slate-800/90 border border-purple-500/50 rounded-lg p-4 shadow-lg component-box z-20 flex flex-col items-center justify-center text-center">
+                <h3 class="font-bold text-purple-400 mb-2">Touch Screen</h3>
+                <div class="w-full h-16 bg-slate-900 rounded border border-slate-700 flex items-center justify-center">
+                    <span class="text-xs text-slate-500">GUI Dashboard</span>
+                </div>
+                <div class="mt-2 text-[10px] text-slate-400">HDMI + USB Touch<br>eller DSI Ribbon</div>
+            </div>
+
+            <!-- 5. ARDUINO + GROVE SHIELD -->
+            <div class="absolute top-[300px] left-[540px] w-[320px] h-[480px] bg-slate-800/90 border border-cyan-500/50 rounded-lg p-4 shadow-lg component-box z-20">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="font-bold text-cyan-400">Arduino Uno R3</h3>
+                        <div class="text-xs text-cyan-200">+ Grove Base Shield v2</div>
+                    </div>
+                    <span class="text-[10px] bg-cyan-900 text-cyan-100 px-1 rounded">Sensor Hub</span>
+                </div>
+
+                <div class="bg-black/30 p-2 rounded mb-2 border border-slate-600 flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <span class="text-[10px] text-slate-300">USB Type-B (Power & Serial Data)</span>
+                </div>
+
+                <!-- Grove Ports Visualization -->
+                <div class="grid grid-cols-2 gap-x-8 gap-y-2 mt-4 relative">
+                    
+                    <!-- Analog Side (Left) -->
+                    <div class="space-y-2">
+                        <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-700 mb-1">Analog</div>
+                        
+                        <div class="relative flex items-center justify-between group">
+                            <span class="mono text-xs text-yellow-400">A0</span>
+                            <span class="text-[10px] text-right">Flammesensor</span>
+                            <div class="absolute right-[-20px] w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        </div>
+                        <div class="relative flex items-center justify-between group">
+                            <span class="mono text-xs text-yellow-400">A1</span>
+                            <span class="text-[10px] text-right">Mikrofon</span>
+                            <div class="absolute right-[-20px] w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        </div>
+                        <div class="relative flex items-center justify-between group">
+                            <span class="mono text-xs text-yellow-400">A2</span>
+                            <span class="text-[10px] text-right">Puls (Hjerte)</span>
+                            <div class="absolute right-[-20px] w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        </div>
+                        <div class="relative flex items-center justify-between group">
+                            <span class="mono text-xs text-yellow-400">A3</span>
+                            <span class="text-[10px] text-right">Vibrasjon</span>
+                            <div class="absolute right-[-20px] w-2 h-2 bg-yellow-500 rounded-full"></div>
+                        </div>
+                    </div>
+
+                    <!-- Digital Side (Right) -->
+                    <div class="space-y-2">
+                        <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-700 mb-1">Digital</div>
+
+                        <div class="relative flex items-center justify-between">
+                            <div class="absolute left-[-20px] w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span class="text-[10px]">Ultralyd</span>
+                            <span class="mono text-xs text-pink-400">D2</span>
+                        </div>
+                        <div class="relative flex items-center justify-between">
+                            <div class="absolute left-[-20px] w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span class="text-[10px]">Tilt Sensor</span>
+                            <span class="mono text-xs text-pink-400">D3</span>
+                        </div>
+                        <div class="relative flex items-center justify-between">
+                            <div class="absolute left-[-20px] w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span class="text-[10px]">Treffsensor</span>
+                            <span class="mono text-xs text-pink-400">D4</span>
+                        </div>
+                        <div class="relative flex items-center justify-between">
+                            <div class="absolute left-[-20px] w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span class="text-[10px]">IR Hindring</span>
+                            <span class="mono text-xs text-pink-400">D5</span>
+                        </div>
+                        <div class="relative flex items-center justify-between">
+                            <div class="absolute left-[-20px] w-2 h-2 bg-yellow-500 rounded-full"></div>
+                            <span class="text-[10px]">Touch Knapp</span>
+                            <span class="mono text-xs text-pink-400">D6</span>
+                        </div>
+                        <div class="relative flex items-center justify-between">
+                            <div class="absolute left-[-20px] w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span class="text-[10px]">Buzzer (Ut)</span>
+                            <span class="mono text-xs text-green-400">D7</span>
+                        </div>
+                        <div class="relative flex items-center justify-between">
+                            <div class="absolute left-[-20px] w-2 h-2 bg-green-500 rounded-full"></div>
+                            <span class="text-[10px]">Laser/Rele (Ut)</span>
+                            <span class="mono text-xs text-green-400">D8</span>
+                        </div>
+                    </div>
+
+                    <!-- I2C Bottom -->
+                    <div class="col-span-2 mt-2 pt-2 border-t border-slate-700 text-center relative">
+                         <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">I2C Bus (Parallell)</div>
+                         <div class="flex justify-center gap-4">
+                             <span class="text-xs bg-slate-700 px-2 py-1 rounded">Temp/Fukt</span>
+                             <span class="text-xs bg-slate-700 px-2 py-1 rounded">Akselerometer</span>
+                         </div>
+                         <div class="absolute bottom-[-20px] left-1/2 w-1 h-4 bg-pink-500"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SENSORS COLUMN (Right side) -->
+            <div class="absolute top-[370px] left-[900px] flex flex-col gap-2 z-20">
+                <div class="bg-slate-800 border border-yellow-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">🔥 Flamme</div>
+                <div class="bg-slate-800 border border-yellow-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">🎤 Mikrofon</div>
+                <div class="bg-slate-800 border border-yellow-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">❤️ Puls</div>
+                <div class="bg-slate-800 border border-yellow-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">〰️ Vibrasjon</div>
+                <div class="h-4"></div> <!-- Spacer -->
+                <div class="bg-slate-800 border border-pink-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">🦇 Ultralyd (Avst)</div>
+                <div class="bg-slate-800 border border-pink-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">📐 Tilt (Velt)</div>
+                <div class="bg-slate-800 border border-pink-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">💥 Treff (Krasj)</div>
+                <div class="bg-slate-800 border border-pink-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">🚧 IR (Nærhet)</div>
+                <div class="bg-slate-800 border border-pink-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">👆 Touch (Panic)</div>
+                <div class="bg-slate-800 border border-green-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">🔊 Buzzer Alarm</div>
+                <div class="bg-slate-800 border border-green-600/50 p-2 rounded text-[10px] text-slate-300 w-32 shadow-sm">🔦 Laser Varsel</div>
+            </div>
+
+            <!-- I2C Sensors Bottom -->
+            <div class="absolute top-[800px] left-[550px] flex gap-4 z-20">
+                <div class="bg-slate-800 border border-pink-500/50 p-3 rounded text-xs text-slate-300 w-32 shadow-sm text-center">
+                    🌡️ DHT Sensor<br>(Temp & Fukt)
+                </div>
+                <div class="bg-slate-800 border border-pink-500/50 p-3 rounded text-xs text-slate-300 w-32 shadow-sm text-center">
+                    🧭 IMU 3-Axis<br>(Akselerometer)
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <footer class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-500">
+        <div class="bg-slate-800 p-4 rounded border border-slate-700">
+            <h4 class="font-bold text-slate-300 mb-2">Viktig om Strøm</h4>
+            <p>Jetson Orin Nano krever sin egen dedikerte strømforsyning (DC Jack). Ikke forsøk å gi den strøm via USB fra Pi-en. Raspberry Pi bør ha en 3A USB-C lader pga. skjermen.</p>
+        </div>
+        <div class="bg-slate-800 p-4 rounded border border-slate-700">
+            <h4 class="font-bold text-slate-300 mb-2">Sensorlogikk</h4>
+            <p>Arduinoen leser alle sensorene kontinuerlig og sender en datapakke (JSON String) over USB Serial til Raspberry Pi hvert 50ms.</p>
+        </div>
+        <div class="bg-slate-800 p-4 rounded border border-slate-700">
+            <h4 class="font-bold text-slate-300 mb-2">Systemflyt</h4>
+            <p>[Sensorer] ➔ [Arduino] ➔ (USB) ➔ [Raspberry Pi Frontend] ⟷ (Ethernet) ⟷ [Jetson AI Backend]</p>
+        </div>
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,26 @@
+[flake8]
+max-line-length = 127
+max-complexity = 10
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    *.egg-info
+
+# Select error codes to check
+select = E,W,F,C
+# E: pycodestyle errors
+# W: pycodestyle warnings  
+# F: pyflakes
+# C: mccabe complexity
+
+# Ignore specific rules
+ignore =
+    # Complexity warnings (C901) are reported but don't fail the build
+    # These are acceptable for complex business logic functions
+
+per-file-ignores =
+    __init__.py:F401

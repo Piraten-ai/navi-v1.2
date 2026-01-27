@@ -1,0 +1,43 @@
+﻿# Raspberry Pi UI and bridge
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "http://${JETSON_HOST}:8000"
+        VITE_WS_URL: "ws://${JETSON_HOST}:8000/ws"
+        VITE_SIGNALK_HOST: "http://${JETSON_HOST}:3001"
+    container_name: aads-frontend-pi
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    networks:
+      - aads-pi-network
+
+  bridge:
+    build: ./bridge
+    container_name: aads-bridge-pi
+    profiles: ["bridge"]
+    environment:
+      - JETSON_HOST=${JETSON_HOST:-192.168.39.196}
+      - JETSON_PORT=${JETSON_PORT:-8000}
+      - SERIAL_DEVICE=${SERIAL_DEVICE:-/dev/ttyACM0}
+      - SERIAL_BAUD=${SERIAL_BAUD:-115200}
+      - SERIAL_REQUIRED=${SERIAL_REQUIRED:-true}
+      - SERIAL_ENABLED=${SERIAL_ENABLED:-true}
+      - SERIAL_DEVICE_2=${SERIAL_DEVICE_2:-}
+      - SERIAL_BAUD_2=${SERIAL_BAUD_2:-115200}
+      - BRIDGE_ENDPOINT=${BRIDGE_ENDPOINT:-/api/v1/bridge/analog}
+      - SENSE_HAT_ENABLED=${SENSE_HAT_ENABLED:-auto}
+      - SENSE_HAT_INTERVAL=${SENSE_HAT_INTERVAL:-2.0}
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0
+      - /dev/i2c-1:/dev/i2c-1
+    restart: unless-stopped
+    networks:
+      - aads-pi-network
+
+networks:
+  aads-pi-network:
+    driver: bridge

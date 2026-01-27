@@ -1,0 +1,9 @@
+services:
+  tileserver:
+    image: maptiler/tileserver-gl:latest
+    container_name: aads-tileserver
+    ports:
+      - "8080:8080"
+    volumes:
+      - /opt/aads/tiles:/data
+    restart: unless-stopped

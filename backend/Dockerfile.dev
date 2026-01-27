@@ -1,0 +1,39 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    python3-dev \
+    libpq-dev \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    libsndfile1 \
+    espeak-ng \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+COPY tests/requirements-test.txt tests/requirements-test.txt
+
+# Install Python dependencies
+# Using 3.11 ensures best compatibility with Jetson pre-built wheels
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements.txt -r tests/requirements-test.txt
+
+# Copy application
+COPY app/ app/
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/data /app/models/piper /app/audio
+
+# Expose port
+EXPOSE 8000
+
+# Run application
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

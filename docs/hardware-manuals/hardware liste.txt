@@ -1,0 +1,99 @@
+dette er et forslag/utkast ingen ting er skrivd i stein !!!!!
+
+
+================================================================================
+PROSJEKT DOKUMENTASJON: AADS (Autonom Arktisk Digital Styrmann)
+VERSJON: 4.0 (Touchscreen Frontend Edition)
+DATO: 25.01.2026
+================================================================================
+
+1. SYSTEMOVERSIKT OG ROLLEFORDELING
+--------------------------------------------------------------------------------
+Nivå 1 (Hjernen):   NVIDIA Jetson Orin Nano
+                    - Rolle: AI-prosessering (objektgjenkjenning, navigasjon).
+                    - Status: "Headless" (Ingen skjerm tilkoblet direkte).
+                    - Strøm: DC Jack (9-19V).
+
+Nivå 2 (Frontend):  Raspberry Pi 4 Model B + Touch Screen
+                    - Rolle: Dashboard/GUI. Viser data fra Jetson og sensorer.
+                    - Input: Touch-skjerm for operatør-kommandoer.
+                    - Strøm: USB-C (5.1V, 3A).
+
+Nivå 3 (Sensorer):  Arduino Uno + Grove Base Shield
+                    - Rolle: I/O-kontroller. Leser fysiske sensorer.
+                    - Strøm: Får strøm fra Raspberry Pi via USB.
+
+FLYT: [Sensorer] -> [Arduino] -> (USB) -> [RPi Skjerm] <- (Nettverk) <- [Jetson]
+
+
+--------------------------------------------------------------------------------
+2. KOBLINGSSKJEMA: KOMMUNIKASJON & SKJERM
+--------------------------------------------------------------------------------
+
+A. JETSON ORIN <-> RASPBERRY PI (Data Link)
+   ----------------------------------------
+   Type:        Ethernet (Anbefalt) eller USB-C
+   Kobling:     Nettverkskabel mellom Jetson og Pi.
+   Protokoll:   Socket (TCP/UDP) eller REST API.
+   Dataflyt:    Jetson sender AI-status (f.eks "Isbjørn oppdaget") til Pi.
+
+B. RASPBERRY PI <-> TOUCH SCREEN (Frontend)
+   ----------------------------------------
+   Alt 1 (HDMI): HDMI-kabel (Bilde) + USB-kabel (Touch-funksjon).
+   Alt 2 (DSI):  Offisiell RPi-skjerm via båndkabel (Ribbon cable) på kortet.
+   Alt 3 (GPIO): Skjerm montert rett på pins (Mindre vanlig for store skjermer).
+
+C. RASPBERRY PI <-> ARDUINO (Sensor Link)
+   ----------------------------------------
+   Type:        USB Seriell
+   Kobling:     USB-A (på Pi) til USB-B (på Arduino).
+   Enhetsnavn:  /dev/ttyACM0 (typisk på Linux/Pi).
+   Baudrate:    115200 (Anbefalt for rask oppdatering).
+
+
+--------------------------------------------------------------------------------
+3. NIVÅ 3: ARDUINO SENSOR HUB (GROVE BASE SHIELD v2)
+--------------------------------------------------------------------------------
+Alle sensorer kobles til Arduinoens Grove Shield.
+Arduinoen sender en ferdig "statuspakke" (JSON eller tekst) til Pi-en.
+
+A. ANALOGE SENSORER (Venstre side av Shield)
++-------+------------------+---------------------+-----------------------------+
+| PORT  | SENSOR NAVN      | FUNKSJON (AADS)     | DATA TYPE                   |
++-------+------------------+---------------------+-----------------------------+
+|  A0   | Flame Sensor     | "Ingeniøren"        | Analog verdi (Branfare)     |
+|  A1   | Sound / Mic      | "Vakten" (Lyd)      | Analog verdi (dB nivå)      |
+|  A2   | Pulse Sensor     | "Legen"             | Analog verdi (Hjerterytme)  |
+|  A3   | Piezo Vibration  | "Vakten" (Støt)     | Analog verdi (Vibrasjon)    |
++-------+------------------+---------------------+-----------------------------+
+
+B. DIGITALE SENSORER (Høyre side av Shield)
++-------+------------------+---------------------+-----------------------------+
+| PORT  | SENSOR NAVN      | FUNKSJON (AADS)     | DATA TYPE                   |
++-------+------------------+---------------------+-----------------------------+
+|  D2   | Ultrasonic       | "Navi" (Sonar)      | Avstand i cm                |
+|  D3   | Tilt Sensor      | "Vakten" (Velt)     | Digital (0 = OK, 1 = Velt)  |
+|  D4   | Hit Sensor       | "Vakten" (Krasj)    | Digital (0 = Fri, 1 = Treff)|
+|  D5   | Obstacle Avoid   | "Navi" (IR Nærhet)  | Digital (0 = Fri, 1 = Hind.)|
+|  D6   | Touch Button     | System Reset/Panic  | Digital (Input fra operatør)|
+|  D7   | Buzzer           | Alarm (Lyd)         | Output (Styres av Pi)       |
+|  D8   | Laser / Relay    | Varsling (Lys)      | Output (Styres av Pi)       |
++-------+------------------+---------------------+-----------------------------+
+
+C. I2C SENSORER (I2C porter - Parallellkoblet)
++-------+------------------+---------------------+-----------------------------+
+| PORT  | SENSOR NAVN      | FUNKSJON (AADS)     | DATA TYPE                   |
++-------+------------------+---------------------+-----------------------------+
+|  I2C  | Temp & Humi      | Klimaovervåkning    | Temperatur (°C) / Fukt (%)  |
+|  I2C  | 3-Axis Accel     | Bevegelse (IMU)     | X, Y, Z Akselerasjon        |
++-------+------------------+---------------------+-----------------------------+
+
+--------------------------------------------------------------------------------
+4. STRØMFORSYNING (POWER BUDGET)
+--------------------------------------------------------------------------------
+1. JETSON ORIN:  Må ha egen strømforsyning (følger med kortet).
+2. RASPBERRY PI: Må ha egen kraftig USB-C lader (3A+), spesielt pga skjermen.
+3. ARDUINO:      Får strøm fra Raspberry Pi sin USB-port.
+                 (OBS: Hvis du legger til motorer eller tunge laster på Arduino,
+                  må Arduinoen ha en egen strømkilde i DC-pluggen).
+================================================================================

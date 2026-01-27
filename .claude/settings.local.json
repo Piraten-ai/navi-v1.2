@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(tree:*)",
+      "Bash(ls:*)",
+      "Bash(dir:*)",
+      "Bash(git add:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker rm:*)",
+      "Bash(docker-compose create:*)",
+      "Bash(docker-compose start:*)",
+      "Bash(docker run:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker build:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix frontend Docker deployment and CORS configuration\n\nChanges:\n- Updated docker-compose.yml frontend env vars to use server IP \\(192.168.39.196\\)\n- Removed nginx backend proxy \\(unnecessary - frontend JS calls API directly\\)\n- Simplified nginx.conf to only serve static files and handle SPA routing\n- CORS now handled entirely by backend config\n\nThis fixes the CORS errors where frontend was trying to connect to\nlocalhost:8000 instead of the actual server IP.\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(curl:*)",
+      "Bash(docker exec aads-frontend sh -c \"cat /usr/share/nginx/html/assets/index-*.js | grep -o ''http://[^\"\"]*:8000'' | head -5\")",
+      "Bash(docker exec aads-frontend sh -c \"cat /usr/share/nginx/html/assets/index-*.js | grep -o ''ws://[^\"\"]*:8000/ws'' | head -3\")",
+      "Bash(find:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix frontend API endpoints and enhance Arctic theme\n\nAPI Fixes:\n- Fixed Navi chat to use POST with JSON body instead of query params\n- Updated all API calls to use correct /api/v1/ prefix \\(was missing v1\\)\n- Fixed useLegen, usePsykologen, useIngenioren, useNavi hooks\n- This resolves all 404 errors for Navi, Legen, Psykologen, Ingenioren\n\nGUI Enhancements:\n- Enhanced Arctic color palette with brighter cyan \\(#00e5ff\\)\n- Added glitch effect animation for authentic military feel\n- Added pulse-glow animation for critical status indicators\n- Added warning/danger/success color variants\n- Improved theme consistency\n\nNow Navi chat and all AI modules should work correctly!\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(docker exec:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nMajor UI/UX improvements based on maritime command center standards\n\nResearch-driven enhancements based on OpenBridge Design System 6.0 and NATO MIL-STD:\n- Implemented 3-panel mission-critical layout \\(320px left, main center, 360px right\\)\n- Added top status bar with gradient glow for critical system info\n- Enhanced visual hierarchy following military HMI standards\n- Improved module buttons with status indicator stripes\n- Added active module highlighting with pulsing glow animation\n- Better backdrop blur and depth perception\n- NATO-style color coding \\(success=green, warning=yellow, danger=red\\)\n\nUser Experience Improvements:\n- Clearer information hierarchy for faster decision-making\n- Enhanced module visibility with better contrast\n- Active module shows animated status stripe\n- Responsive breakpoints for different screen sizes\n\nBased on research from:\n- OpenBridge Design System 6.0 \\(maritime/industrial UI\\)\n- NATO STANAG APP-6 \\(military symbology\\)\n- MIL-STD tactical display standards\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout 5 cat:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(setx:*)",
+      "Bash(tasklist:*)",
+      "Bash(Get-Process)",
+      "Bash(Where-Object {$_ProcessName -like \"*ollama*\"})",
+      "Bash(nvidia-smi:*)"
+    ]
+  }
+}

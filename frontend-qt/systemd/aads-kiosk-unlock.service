@@ -1,0 +1,13 @@
+[Unit]
+Description=AADS Kiosk Unlock (GPIO)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/aads/frontend-qt/scripts/kiosk_unlock.py
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy=multi-user.target

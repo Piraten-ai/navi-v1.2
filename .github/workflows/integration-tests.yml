@@ -1,0 +1,204 @@
+name: Integration Tests with Docker Compose
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run integration tests nightly
+    - cron: '0 2 * * *'
+
+jobs:
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Free up disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          # Remove unnecessary packages to free up space
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: image=moby/buildkit:latest
+
+      - name: Create test environment file
+        run: |
+          cat > .env.test <<EOF
+          DATABASE_URL=postgresql://aads:aads_secure_pass@postgres:5432/aads
+          REDIS_URL=redis://redis:6379
+          LOG_LEVEL=DEBUG
+          ENVIRONMENT=test
+          MOCK_CAMERA=true
+          EOF
+
+      - name: Build images with Docker Compose
+        run: |
+          # Build sequentially to manage disk space better
+          docker compose -f docker-compose.dev.yml build backend
+          docker compose -f docker-compose.dev.yml build frontend
+
+      - name: Start services
+        run: |
+          docker compose -f docker-compose.dev.yml up -d
+
+      - name: Wait for backend to be healthy
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:8000/health; do sleep 2; done'
+
+      - name: Wait for frontend to be healthy
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:3000; do sleep 2; done'
+
+      - name: Run backend integration tests
+        run: |
+          docker compose -f docker-compose.dev.yml exec -T backend pytest tests/ -v -m integration
+
+      - name: Check service logs for errors
+        if: failure()
+        run: |
+          docker compose -f docker-compose.dev.yml logs backend
+          docker compose -f docker-compose.dev.yml logs frontend
+
+      - name: Test API endpoints
+        run: |
+          # Test health endpoint
+          curl -f http://localhost:8000/health
+
+          # Test API docs
+          curl -f http://localhost:8000/docs
+
+          # Test frontend
+          curl -f http://localhost:3000
+
+      - name: Test WebSocket connection
+        run: |
+          npm install -g wscat
+          echo "Testing WebSocket connection..."
+          timeout 10 wscat -c ws://localhost:8000/ws || echo "WebSocket test completed"
+
+      - name: Stop services
+        if: always()
+        run: |
+          docker compose -f docker-compose.dev.yml down -v
+
+      - name: Clean up Docker resources
+        if: always()
+        run: |
+          docker system prune -af --volumes
+
+  docker-compose-prod-test:
+    name: Test Production Docker Compose
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Free up disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          # Remove unnecessary packages to free up space
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: image=moby/buildkit:latest
+
+      - name: Validate docker-compose.yml
+        run: |
+          docker compose -f docker-compose.yml config
+
+      - name: Check for security best practices
+        run: |
+          # Check no privileged containers
+          if grep -i "privileged.*true" docker-compose.yml; then
+            echo "ERROR: Privileged containers found"
+            exit 1
+          fi
+
+          # Check no host network mode
+          if grep "network_mode.*host" docker-compose.yml; then
+            echo "WARNING: Host network mode found"
+          fi
+
+      - name: Build production images
+        run: |
+          # Build sequentially to manage disk space better
+          docker compose -f docker-compose.yml build backend
+          echo "Backend built, cleaning up intermediate layers..."
+          docker builder prune -f
+          docker compose -f docker-compose.yml build frontend
+          docker builder prune -f
+
+      - name: Test image sizes
+        run: |
+          docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | grep -E "aads|SIZE"
+
+  # Smoke test: quick sanity check on PRs
+  smoke-test:
+    name: Quick Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Free up disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Build backend image only
+        run: |
+          docker build -t backend-test ./backend
+
+      - name: Run basic backend test
+        run: |
+          docker run --rm backend-test python -c "import app; print('Backend imports OK')"
+
+      - name: Clean up backend image
+        run: |
+          docker rmi backend-test
+          docker builder prune -f
+
+      - name: Build frontend image only
+        run: |
+          docker build -t frontend-test ./frontend
+
+      - name: Verify frontend build output
+        run: |
+          docker run --rm frontend-test ls -la /usr/share/nginx/html

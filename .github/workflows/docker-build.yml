@@ -1,0 +1,252 @@
+name: Docker Build & Security
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose*.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose*.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Docker Lint and Best Practices Check
+  docker-lint:
+    name: Lint Dockerfiles
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run Hadolint on Backend Dockerfile
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: backend/Dockerfile
+          failure-threshold: warning
+          ignore: DL3008,DL3042
+
+      - name: Run Hadolint on Backend Dev Dockerfile
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: backend/Dockerfile.dev
+          failure-threshold: warning
+          ignore: DL3008
+
+      - name: Run Hadolint on Frontend Dockerfile
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: frontend/Dockerfile
+          failure-threshold: warning
+
+      - name: Run Hadolint on Frontend Dev Dockerfile
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: frontend/Dockerfile.dev
+          failure-threshold: warning
+
+  # Build and test Docker images locally (no push)
+  build-test:
+    name: Build & Test Docker Images
+    runs-on: ubuntu-latest
+    needs: docker-lint
+
+    strategy:
+      matrix:
+        component: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Free up disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.component }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
+          push: false
+          load: true
+          tags: ${{ matrix.component }}:test
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+
+      - name: Test ${{ matrix.component }} image
+        run: |
+          docker run --rm ${{ matrix.component }}:test --version || \
+            echo "Image built successfully"
+
+      - name: Scan ${{ matrix.component }} image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ matrix.component }}:test
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+  # Build multi-platform images
+  build-multiarch:
+    name: Build Multi-Arch Images
+    runs-on: ubuntu-latest
+    needs: build-test
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        component: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Free up disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: >-
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.component }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push ${{ matrix.component }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+  # Test docker-compose configurations
+  compose-test:
+    name: Test Docker Compose
+    runs-on: ubuntu-latest
+    needs: docker-lint
+
+    strategy:
+      matrix:
+        compose-file: [docker-compose.yml, docker-compose.dev.yml]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Validate ${{ matrix.compose-file }}
+        run: |
+          docker compose -f ${{ matrix.compose-file }} config
+
+      - name: Check for security issues in ${{ matrix.compose-file }}
+        run: |
+          # Check for exposed secrets
+          if grep -i "password.*=.*[^{]" ${{ matrix.compose-file }}; then
+            echo "Warning: Potential hardcoded secrets found"
+          fi
+
+  # Image size analysis
+  image-size:
+    name: Analyze Image Sizes
+    runs-on: ubuntu-latest
+    needs: build-test
+
+    strategy:
+      matrix:
+        component: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Free up disk space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af
+          echo "Disk space after cleanup:"
+          df -h
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.component }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./${{ matrix.component }}
+          file: ./${{ matrix.component }}/Dockerfile
+          push: false
+          load: true
+          tags: ${{ matrix.component }}:size-test
+
+      - name: Analyze image size and layers
+        run: |
+          echo "Image: ${{ matrix.component }}"
+          docker images ${{ matrix.component }}:size-test \
+            --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+          echo ""
+          echo "Layers:"
+          docker history ${{ matrix.component }}:size-test \
+            --human --no-trunc

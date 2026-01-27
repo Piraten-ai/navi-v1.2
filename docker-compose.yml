@@ -1,0 +1,143 @@
+﻿services:
+  backend:
+    build: ./backend
+    container_name: aads-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./config/backend.env.jetson
+    environment:
+      - VOICE_ENABLED=true
+      - PIPER_VOICE_MODEL=/app/models/piper/en_US-lessac-medium.onnx
+      - WHISPER_MODEL_SIZE=tiny.en
+    volumes:
+      - ./backend/app:/app/app
+      - ./logs:/app/logs
+      - ./models/piper:/app/models/piper:ro
+      - ./audio:/app/audio:ro
+    # Uncomment if camera is attached:
+    # devices:
+    #   - /dev/video0:/dev/video0
+    depends_on:
+      - postgres
+      - influxdb
+      - redis
+      - minio
+      - navi
+      - signalk
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: aads-postgres
+    environment:
+      - POSTGRES_DB=aads
+      - POSTGRES_USER=aads
+      - POSTGRES_PASSWORD=aads_secure_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: aads-influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=aads
+      - DOCKER_INFLUXDB_INIT_PASSWORD=aads_influx_pass
+      - DOCKER_INFLUXDB_INIT_ORG=aads
+      - DOCKER_INFLUXDB_INIT_BUCKET=aads_metrics
+      - DOCKER_INFLUXDB_INIT_RETENTION=30d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=aads_influx_token
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: aads-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: aads-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  navi:
+    image: ollama/ollama:latest
+    container_name: aads-navi-ollama
+    runtime: nvidia
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_BASE_URL=http://navi:11434
+      - GORDON_MODEL=phi
+      - NAVI_MODEL=gemma:2b
+      - OLLAMA_HOST=0.0.0.0
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+  signalk:
+    image: signalk/signalk-server:latest
+    container_name: aads-signalk
+    ports:
+      - "3001:3000"
+      - "10332:10332/udp"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - signalk_data:/root/.signalk
+    restart: unless-stopped
+    networks:
+      - aads-network
+
+volumes:
+  postgres_data:
+    driver: local
+  influxdb_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  ollama_data:
+    driver: local
+  signalk_data:
+    driver: local
+
+networks:
+  aads-network:
+    driver: bridge

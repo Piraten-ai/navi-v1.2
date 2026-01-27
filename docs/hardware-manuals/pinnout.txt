@@ -1,0 +1,194 @@
+┌────────────────────────────┐
+│     Raspberry Pi 4        │
+│  • Touchskjerm / HDMI UI  │
+│  • Viser sensorstatus     │
+│  • Kommuniserer med Jetson│
+└────────────┬──────────────┘
+             │ Ethernet / USB / UART
+             ▼
+┌────────────────────────────┐
+│     Jetson Orin Nano         │
+│  • Kamera (termisk, vanlig)│
+│  • AI / bildeanalyse       │
+│  • Beslutningslogikk       │
+│  • Kommunikasjon med Pi og Arduino │
+└────────────┬──────────────┘
+             │ UART / I2C / USB
+             ▼
+┌────────────────────────────┐
+│     Arduino UNO + Grove    │
+│  • Analoge sensorer        │
+│  • Digitale IO (knapper, releer) │
+│  • Grove Base Shield V2    │
+└────────────────────────────┘
+================================================================================
+ELECTRICAL PINOUT SCHEMATIC COMPILATION
+File Generated: 2026-01-25
+Contents:
+  1. Arduino Uno R3
+  2. Raspberry Pi 4 Model B (J8 Header)
+  3. NVIDIA Jetson Orin Nano Carrier (P3768-A04 J12 Header)
+  4. Seeed Studio Base Shield v2 (Grove Ports)
+================================================================================
+
+--------------------------------------------------------------------------------
+1. ARDUINO UNO R3
+   Logic Level: 5V
+   [cite_start]Input Voltage (VIN): 6-20V [cite: 110]
+   [cite_start]Max Current per I/O Pin: 20mA [cite: 107]
+   [cite_start]Max Current on 3.3V Pin: 50mA [cite: 109]
+--------------------------------------------------------------------------------
+
+       (USB Port Side)
+      +---------------+
+      |  ARDUINO UNO  |
+      +---------------+
+
+ POWER / CONTROL
+ [ RESET ]      (Reset)
+ [ 3.3V  ]      (Output, Max 50mA)
+ [ 5V    ]      (Output, Regulated)
+ [ GND   ]      (Ground)
+ [ GND   ]      (Ground)
+ [ VIN   ]      (Input: 6-20V)
+
+ ANALOG IN (0-5V)
+ [ A0    ]      (Analog In)
+ [ A1    ]      (Analog In)
+ [ A2    ]      (Analog In)
+ [ A3    ]      (Analog In)
+ [ A4    ]      (Analog In / SDA)
+ [ A5    ]      (Analog In / SCL)
+
+ DIGITAL I/O (5V Logic, Max 20mA Source/Sink)
+ [ SCL   ]      (I2C Clock)
+ [ SDA   ]      (I2C Data)
+ [ AREF  ]      (Analog Reference)
+ [ GND   ]      (Ground)
+ [ D13   ]      (SCK  / SPI / LED)
+ [ D12   ]      (MISO / SPI)
+ [ D11   ]      (MOSI / SPI / PWM)
+ [ D10   ]      (SS   / SPI / PWM)
+ [ D9    ]      (PWM)
+ [ D8    ]      (Digital)
+ [ D7    ]      (Digital)
+ [ D6    ]      (PWM)
+ [ D5    ]      (PWM)
+ [ D4    ]      (Digital)
+ [ D3    ]      (PWM / INT1)
+ [ D2    ]      (INT0)
+ [ D1    ]      (TX / Serial)
+ [ D0    ]      (RX / Serial)
+
+
+--------------------------------------------------------------------------------
+2. RASPBERRY PI 4 MODEL B (J8 GPIO HEADER)
+   Logic Level: 3.3V (NOT 5V TOLERANT)
+   [cite_start]Global Enable: 5V Logic [cite: 468]
+   [cite_start]Run Pin: 3.3V Logic [cite: 468]
+--------------------------------------------------------------------------------
+
+        J8 GPIO HEADER
+      +------------------+
+ 3.3V |  1      2 | 5V
+SD/I2C|  3      4 | 5V
+SD/I2C|  5      6 | GND
+  GP4 |  7      8 | TXD0 (UART)
+  GND |  9     10 | RXD0 (UART)
+ GP17 | 11     12 | GP18
+ GP27 | 13     14 | GND
+ GP22 | 15     16 | GP23
+ 3.3V | 17     18 | GP24
+MOS/SP| 19     20 | GND
+MIS/SP| 21     22 | GP25
+SCK/SP| 23     24 | CE0 (SPI)
+  GND | 25     26 | CE1 (SPI)
+ID_SD | 27     28 | ID_SC
+ GP5  | 29     30 | GND
+ GP6  | 31     32 | GP12 (PWM0)
+ GP13 | 33     34 | GND
+ GP19 | 35     36 | GP16
+ GP26 | 37     38 | GP20
+  GND | 39     40 | GP21
+      +------------------+
+
+*GP# refers to BCM GPIO numbers.
+*All Signal pins are 3.3V only.
+
+
+--------------------------------------------------------------------------------
+3. NVIDIA JETSON ORIN Nano CARRIER (P3768-A04)
+   Logic Level: 3.3V (Level Shifted)
+   [cite_start]Input Power (DC Jack): 9V - 19V @ 3A [cite: 659]
+   [cite_start]Fan Header: 5V PWM [cite: 1049]
+--------------------------------------------------------------------------------
+
+    40-PIN EXPANSION HEADER (J12)
+      +-----------------------+
+ 3.3V |  1      2 | 5V
+I2C_2 |  3      4 | 5V
+I2C_2 |  5      6 | GND
+GP.09 |  7      8 | UART_TX
+  GND |  9     10 | UART_RX
+GP.13 | 11     12 | I2S_CLK
+GP.14 | 13     14 | GND
+GP.15 | 15     16 | GP.08
+ 3.3V | 17     18 | GP.16
+SPI_1 | 19     20 | GND
+SPI_1 | 21     22 | GP.17
+SPI_1 | 23     24 | SPI_1_CS0
+  GND | 25     26 | SPI_1_CS1
+ID_I2C| 27     28 | ID_I2C
+GP.05 | 29     30 | GND
+GP.06 | 31     32 | GP.07 (PWM)
+GP.12 | 33     34 | GND
+I2S_FS| 35     36 | UART_CTS
+GP.18 | 37     38 | I2S_DIN
+  GND | 39     40 | I2S_DOUT
+      +-----------------------+
+
+
+--------------------------------------------------------------------------------
+4. SEEED STUDIO BASE SHIELD V2
+   Operating Voltage: Switchable 3.3V / 5V
+   Connector Type: 4-Pin Grove (2.0mm Pitch)
+   Pinout Standard: [ 1:Signal 1 | 2:Signal 2 | 3:VCC | 4:GND ]
+--------------------------------------------------------------------------------
+
+ POWER SWITCH: [ 3.3V | 5V ]
+ (Controls VCC pin voltage and logic levels for all ports)
+
+ DIGITAL PORTS (D2-D8)
+ +------+-------------+-------------+-----+-----+
+ | PORT | PIN 1 (Yel) | PIN 2 (Wht) | VCC | GND |
+ +------+-------------+-------------+-----+-----+
+ |  D2  |     D2      |     D3      | Vsw | GND |
+ |  D3  |     D3      |     D4      | Vsw | GND |
+ |  D4  |     D4      |     D5      | Vsw | GND |
+ |  D5  |     D5      |     D6      | Vsw | GND |
+ |  D6  |     D6      |     D7      | Vsw | GND |
+ |  D7  |     D7      |     D8      | Vsw | GND |
+ |  D8  |     D8      |     D9      | Vsw | GND |
+ +------+-------------+-------------+-----+-----+
+
+ ANALOG PORTS (A0-A3)
+ +------+-------------+-------------+-----+-----+
+ | PORT | PIN 1 (Yel) | PIN 2 (Wht) | VCC | GND |
+ +------+-------------+-------------+-----+-----+
+ |  A0  |     A0      |     A1      | Vsw | GND |
+ |  A1  |     A1      |     A2      | Vsw | GND |
+ |  A2  |     A2      |     A3      | Vsw | GND |
+ |  A3  |     A3      |     A4      | Vsw | GND |
+ +------+-------------+-------------+-----+-----+
+
+ COMMUNICATION PORTS
+ +------+-------------+-------------+-----+-----+
+ | PORT | PIN 1 (Yel) | PIN 2 (Wht) | VCC | GND |
+ +------+-------------+-------------+-----+-----+
+ | UART |  TX (D1)    |  RX (D0)    | Vsw | GND |
+ | I2C  |  SDA        |  SCL        | Vsw | GND |
+ +------+-------------+-------------+-----+-----+
+ (Note: Base Shield has four parallel I2C headers)
+
+================================================================================
+END OF FILE
