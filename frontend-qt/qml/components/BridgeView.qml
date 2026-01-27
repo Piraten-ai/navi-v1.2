@@ -1,10 +1,10 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import ".."
 
 Item {
     id: root
-    property var theme
     property var aadsClient
 
     ColumnLayout {
@@ -12,18 +12,19 @@ Item {
         spacing: 12
 
         Label {
-            text: "Analog Bridge"
-            color: theme.text
+            text: qsTr("Analog Bridge")
+            color: Theme.text
             font.pixelSize: 24
             font.bold: true
+            font.family: Theme.fontDisplay
         }
 
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: theme.radiusMd
-            color: theme.panelSoft
-            border.color: theme.grid
+            radius: Theme.radiusMd
+            color: Theme.panelSoft
+            border.color: Theme.grid
             border.width: 1
 
             ColumnLayout {
@@ -32,22 +33,23 @@ Item {
                 spacing: 10
 
                 Label {
-                    text: "Bridge Signals"
-                    color: theme.muted
+                    text: qsTr("Bridge Signals")
+                    color: Theme.muted
                     font.pixelSize: 16
+                    font.family: Theme.fontMono
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 12
                     Label {
-                        text: "Source: " + (aadsClient.bridgeSource === "" ? "unknown" : aadsClient.bridgeSource)
-                        color: theme.text
+                        text: qsTr("Source: %1").arg(aadsClient.bridgeSource === "" ? qsTr("unknown") : aadsClient.bridgeSource)
+                        color: Theme.text
                         font.pixelSize: 12
                     }
                     Label {
-                        text: "Timestamp: " + (aadsClient.bridgeTimestamp === "" ? "none" : aadsClient.bridgeTimestamp)
-                        color: theme.muted
+                        text: qsTr("Timestamp: %1").arg(aadsClient.bridgeTimestamp === "" ? qsTr("none") : aadsClient.bridgeTimestamp)
+                        color: Theme.muted
                         font.pixelSize: 12
                     }
                 }
@@ -60,9 +62,9 @@ Item {
                         delegate: Rectangle {
                             width: 180
                             height: 54
-                            radius: theme.radiusSm
+                            radius: Theme.radiusSm
                             color: "#0b131b"
-                            border.color: theme.grid
+                            border.color: Theme.grid
                             border.width: 1
                             ColumnLayout {
                                 anchors.fill: parent
@@ -70,12 +72,12 @@ Item {
                                 spacing: 2
                                 Label {
                                     text: modelData.name
-                                    color: theme.muted
+                                    color: Theme.muted
                                     font.pixelSize: 11
                                 }
                                 Label {
                                     text: modelData.value
-                                    color: theme.text
+                                    color: Theme.text
                                     font.pixelSize: 18
                                     font.bold: true
                                 }
@@ -87,9 +89,9 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    radius: theme.radiusSm
+                    radius: Theme.radiusSm
                     color: "#0b131b"
-                    border.color: theme.grid
+                    border.color: Theme.grid
                     border.width: 1
 
                     ColumnLayout {
@@ -97,8 +99,8 @@ Item {
                         anchors.margins: 12
                         spacing: 6
                         Label {
-                            text: "Latest WS message"
-                            color: theme.muted
+                            text: qsTr("Latest WS message")
+                            color: Theme.muted
                             font.pixelSize: 12
                         }
                         TextArea {
@@ -108,7 +110,7 @@ Item {
                             wrapMode: Text.Wrap
                             text: aadsClient.lastWsMessage
                             font.pixelSize: 12
-                            color: theme.text
+                            color: Theme.text
                         }
                     }
                 }

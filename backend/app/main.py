@@ -1,6 +1,7 @@
 """AADS FastAPI Application - Main entry point."""
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any
@@ -9,10 +10,12 @@ import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, status, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.dependencies import lifespan_context, verify_system_health
+from app.core.flight_recorder import recorder
 from app.core.logging import get_logger
 
 # Import modules
@@ -390,6 +393,12 @@ app = FastAPI(
     openapi_url=f"{settings.API_PREFIX}/openapi.json",
     lifespan=lifespan,
 )
+
+tiles_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "tiles"))
+if not os.path.exists(tiles_dir):
+    os.makedirs(tiles_dir, exist_ok=True)
+    logger.warning("Tiles directory missing; created empty directory", extra={"path": tiles_dir})
+app.mount("/tiles", StaticFiles(directory=tiles_dir), name="tiles")
 
 # CORS Middleware
 app.add_middleware(
@@ -911,6 +920,12 @@ async def get_signalk_status():
 async def get_signalk_data():
     """Get current Signal K data"""
     return {"data": signalk.get_data(), "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get(f"{settings.API_PREFIX}/history/{{sensor_key}}", tags=["telemetry"])
+async def get_sensor_history(sensor_key: str):
+    """Get recent history values for a sensor key."""
+    return {"key": sensor_key, "history": recorder.get_history(sensor_key)}
 
 
 @app.post(f"{settings.API_PREFIX}/signalk/start", tags=["signalk"])

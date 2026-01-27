@@ -66,19 +66,21 @@ class IngeniørenModule:
                 network = {"available": False}
 
             # Temperature (if available)
+            cpu_temp = None
             try:
                 temps = psutil.sensors_temperatures()
                 if temps:
-                    cpu_temp = None
                     for name, entries in temps.items():
                         if "cpu" in name.lower() or "core" in name.lower():
                             cpu_temp = entries[0].current if entries else None
                             break
-                    temperature = {"cpu_temp_c": cpu_temp} if cpu_temp else {"available": False}
-                else:
-                    temperature = {"available": False}
             except (OSError, AttributeError):
-                temperature = {"available": False}
+                cpu_temp = None
+
+            if cpu_temp is None:
+                cpu_temp = self._read_thermal_zone_temp()
+
+            temperature = {"cpu_temp_c": cpu_temp} if cpu_temp is not None else {"available": False}
 
             # Boot time
             try:
@@ -216,6 +218,16 @@ class IngeniørenModule:
         if self.fan_mode == "auto":
             self.fan_speed = max(0, min(100, speed))
             logger.info(f"Auto fan adjusted to {self.fan_speed}%")
+
+    def _read_thermal_zone_temp(self) -> Optional[float]:
+        """Read CPU temperature from Linux thermal zone (Pi/Jetson fallback)."""
+        path = "/sys/class/thermal/thermal_zone0/temp"
+        try:
+            with open(path, "r") as handle:
+                raw = handle.read().strip()
+            return int(raw) / 1000.0
+        except (OSError, ValueError):
+            return None
 
     def update_leeway(self, wind_speed: float, wind_angle: float, boat_speed: float):
         """Calculate leeway based on wind/speed physics"""

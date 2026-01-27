@@ -1,91 +1,119 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import ".."
 
 Rectangle {
     id: root
-    property var theme
     property var serviceOk: function(name) { return false; }
     property string currentView: "dashboard"
+    property bool linkOk: false
     signal viewSelected(string view)
 
-    height: 56
-    radius: theme.radiusLg
-    color: theme.panel
-    border.color: theme.panelEdge
+    height: 64
+    radius: Theme.radiusLg + 2
+    gradient: Gradient {
+        GradientStop { position: 0.0; color: Qt.rgba(Theme.panel.r, Theme.panel.g, Theme.panel.b, 0.95) }
+        GradientStop { position: 1.0; color: Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.95) }
+    }
+    border.color: Theme.panelEdge
     border.width: 1
 
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 18
-        spacing: 16
+        anchors.margins: 16
+        spacing: 14
 
         Item { Layout.fillWidth: true }
-        Item { Layout.fillWidth: true }
 
-        RowLayout {
-            spacing: 10
-            Rectangle {
-                width: 18
-                height: 18
-                radius: 9
-                color: serviceOk("arduino") ? theme.accent : theme.warn
-                opacity: serviceOk("arduino") ? 1.0 : 0.5
-                SequentialAnimation on opacity {
-                    running: serviceOk("arduino")
-                    loops: Animation.Infinite
-                    NumberAnimation { from: 1.0; to: 0.25; duration: 600 }
-                    NumberAnimation { from: 0.25; to: 1.0; duration: 600 }
+        ColumnLayout {
+            spacing: 6
+            Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+
+            RowLayout {
+                spacing: 12
+                StatusLed {
+                    label: qsTr("ARDUINO")
+                    active: serviceOk("arduino")
+                    activeColor: Theme.accent
+                    inactiveColor: Theme.warn
+                    fontFamily: Theme.fontMono
+                }
+                StatusLed {
+                    label: qsTr("JETSON")
+                    active: serviceOk("jetson")
+                    activeColor: Theme.accent
+                    inactiveColor: Theme.warn
+                    fontFamily: Theme.fontMono
                 }
             }
-            Label { text: "ARDUINO"; color: theme.muted; font.pixelSize: 11 }
 
-            Rectangle {
-                width: 18
-                height: 18
-                radius: 9
-                color: serviceOk("jetson") ? theme.accent : theme.warn
-                opacity: serviceOk("jetson") ? 1.0 : 0.5
-                SequentialAnimation on opacity {
-                    running: serviceOk("jetson")
-                    loops: Animation.Infinite
-                    NumberAnimation { from: 1.0; to: 0.25; duration: 600 }
-                    NumberAnimation { from: 0.25; to: 1.0; duration: 600 }
-                }
-            }
-            Label { text: "JETSON"; color: theme.muted; font.pixelSize: 11 }
-        }
+            RowLayout {
+                spacing: 10
 
-        RowLayout {
-            spacing: 8
-            Repeater {
-                model: [
-                    { label: "Sailing", view: "dashboard" },
-                    { label: "Bridge", view: "bridge" },
-                    { label: "Navi", view: "navi" },
-                    { label: "Wiki", view: "wiki" },
-                    { label: "Settings", view: "settings" }
-                ]
-                delegate: Button {
-                    height: 34
-                    padding: 12
-                    text: modelData.label
-                    font.pixelSize: 12
-                    background: Rectangle {
-                        radius: 10
-                        color: root.currentView === modelData.view ? theme.accent : theme.panel
-                        border.color: root.currentView === modelData.view ? theme.ice : theme.grid
-                        border.width: 1
+                Rectangle {
+                    Layout.preferredHeight: 34
+                    Layout.preferredWidth: 360
+                    radius: 18
+                    color: Qt.rgba(Theme.panel.r, Theme.panel.g, Theme.panel.b, 0.7)
+                    border.color: Theme.panelEdge
+                    border.width: 1
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        spacing: 6
+                        Repeater {
+                            model: [
+                                { label: qsTr("Sailing"), view: "dashboard" },
+                                { label: qsTr("Bridge"), view: "bridge" },
+                                { label: qsTr("Navi"), view: "navi" },
+                                { label: qsTr("Wiki"), view: "wiki" },
+                                { label: qsTr("Settings"), view: "settings" }
+                            ]
+                            delegate: Button {
+                                height: 26
+                                Layout.fillWidth: true
+                                padding: 6
+                                text: modelData.label
+                                font.pixelSize: 10
+                                font.family: Theme.fontBody
+                                background: Rectangle {
+                                    radius: 12
+                                    color: root.currentView === modelData.view ? Theme.accent : "transparent"
+                                    border.color: root.currentView === modelData.view ? Theme.accent : "transparent"
+                                    border.width: 1
+                                }
+                                contentItem: Text {
+                                    text: parent.text
+                                    color: root.currentView === modelData.view ? Theme.bg : Theme.textMain
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    horizontalAlignment: Text.AlignHCenter
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                                onClicked: root.viewSelected(modelData.view)
+                            }
+                        }
                     }
-                    contentItem: Text {
-                        text: parent.text
-                        color: root.currentView === modelData.view ? theme.bg : theme.text
-                        font.pixelSize: 12
+                }
+
+                Rectangle {
+                    width: 78
+                    height: 24
+                    radius: 12
+                    color: linkOk ? Theme.indicator : Theme.warn
+                    border.color: Theme.panelEdge
+                    border.width: 1
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: linkOk ? qsTr("LINK OK") : qsTr("LINK LOST")
+                        color: Theme.bg
+                        font.pixelSize: 9
                         font.bold: true
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                        font.family: Theme.fontMono
                     }
-                    onClicked: root.viewSelected(modelData.view)
                 }
             }
         }

@@ -1,32 +1,78 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import ".."
+import "../utils/ProfileHandler.js" as ProfileHandler
+import "../utils/SignalLogic.js" as Logic
 
 Item {
     id: root
-    property var theme
-    property var aadsClient
     property var uiSettings
-    property var profileList: []
-    property var applyProfile
-    property var parseProfiles
-    property var captureSettings
-    property var saveProfiles
-    property var syncProfile
+    property var aadsClient
     property var gaugeGrid
-    property var gaugeCatalog
-    property var gaugeIndexForKey
-    property var setGaugeGridSize
-    property var setGaugeCell
+
     property string newProfileName: ""
+    property var profileList: ProfileHandler.getProfileNames(uiSettings ? uiSettings.profilesJson : "")
+    property var gaugeCatalog: Logic.getCatalog()
+
+    function ensureGrid() {
+        if (gaugeGrid && gaugeGrid.rows && gaugeGrid.cols && gaugeGrid.cells) {
+            return gaugeGrid;
+        }
+        return { rows: 3, cols: 3, cells: [] };
+    }
+
+    function commitGrid(grid) {
+        gaugeGrid = grid;
+        if (uiSettings) {
+            uiSettings.gaugeGridJson = JSON.stringify(grid);
+        }
+    }
+
+    function resizeGrid(rows, cols) {
+        var grid = ensureGrid();
+        grid.rows = rows;
+        grid.cols = cols;
+        var total = rows * cols;
+        if (!grid.cells || !Array.isArray(grid.cells)) {
+            grid.cells = [];
+        }
+        while (grid.cells.length < total) {
+            grid.cells.push("");
+        }
+        if (grid.cells.length > total) {
+            grid.cells = grid.cells.slice(0, total);
+        }
+        commitGrid(grid);
+    }
+
+    function setGaugeCell(index, key) {
+        var grid = ensureGrid();
+        if (index < 0 || index >= grid.cells.length) {
+            return;
+        }
+        grid.cells[index] = key;
+        commitGrid(grid);
+    }
+
+    Connections {
+        target: uiSettings || null
+        function onProfilesJsonChanged() {
+            root.profileList = ProfileHandler.getProfileNames(uiSettings.profilesJson);
+        }
+    }
+
+    Component.onCompleted: {
+        resizeGrid(ensureGrid().rows, ensureGrid().cols);
+    }
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 12
 
         Label {
-            text: "Settings"
-            color: theme.text
+            text: qsTr("Settings")
+            color: Theme.text
             font.pixelSize: 24
             font.bold: true
         }
@@ -34,354 +80,260 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: theme.radiusMd
-            color: theme.panelSoft
-            border.color: theme.grid
+            radius: Theme.radiusMd
+            color: Theme.panelSoft
+            border.color: Theme.grid
             border.width: 1
 
-            ColumnLayout {
+            ScrollView {
                 anchors.fill: parent
-                anchors.margins: 16
-                spacing: 16
+                clip: true
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    radius: theme.radiusSm
-                    color: "transparent"
-                    border.color: theme.grid
-                    border.width: 1
+                ColumnLayout {
+                    width: parent.width - 24
+                    x: 12
+                    y: 12
+                    spacing: 20
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 8
-
-                        Label {
-                            text: "Vessel Profile"
-                            color: theme.text
-                            font.pixelSize: 16
-                            font.bold: true
-                        }
+                    SettingsGroup {
+                        title: qsTr("Vessel Profile")
 
                         RowLayout {
                             spacing: 12
-                            Label { text: "Active"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 100 }
+                            Label { text: qsTr("Active"); color: Theme.muted; Layout.preferredWidth: 100 }
                             ComboBox {
                                 Layout.fillWidth: true
-                                model: profileList
-                                currentIndex: profileList.indexOf(uiSettings.currentProfile)
-                                onActivated: {
-                                    if (currentIndex >= 0 && applyProfile) {
-                                        applyProfile(profileList[currentIndex]);
-                                    }
-                                }
-                            }
-                        }
-
-                        RowLayout {
-                            spacing: 12
-                            Label { text: "New"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 100 }
-                            TextField {
-                                Layout.fillWidth: true
-                                text: root.newProfileName
-                                placeholderText: "e.g. sailboat-01"
-                                onTextChanged: root.newProfileName = text
-                            }
-                            Button {
-                                text: "Add"
-                                onClicked: {
-                                    var name = root.newProfileName.trim();
-                                    if (name.length === 0 || !parseProfiles || !captureSettings || !saveProfiles || !applyProfile) {
+                                model: root.profileList
+                                currentIndex: uiSettings ? root.profileList.indexOf(uiSettings.currentProfile) : 0
+                                onActivated: function(index) {
+                                    if (!uiSettings) {
                                         return;
                                     }
-                                    var obj = parseProfiles();
-                                    if (obj.profiles.indexOf(name) === -1) {
-                                        obj.profiles.push(name);
-                                    }
-                                    obj.data[name] = captureSettings();
-                                    saveProfiles(obj);
-                                    root.newProfileName = "";
-                                    applyProfile(name);
+                                    var name = root.profileList[index];
+                                    uiSettings.currentProfile = name;
+                                    ProfileHandler.applyProfile(uiSettings, aadsClient, name);
                                 }
                             }
-                        }
-                    }
-                }
-
-                RowLayout {
-                    spacing: 12
-                    Label {
-                        text: "API URL"
-                        color: theme.muted
-                        font.pixelSize: 16
-                        Layout.preferredWidth: 100
-                    }
-                    TextField {
-                        Layout.fillWidth: true
-                        text: aadsClient.apiUrl
-                        onEditingFinished: aadsClient.apiUrl = text
-                    }
-                }
-
-                RowLayout {
-                    spacing: 12
-                    Label {
-                        text: "WS URL"
-                        color: theme.muted
-                        font.pixelSize: 16
-                        Layout.preferredWidth: 100
-                    }
-                    TextField {
-                        Layout.fillWidth: true
-                        text: aadsClient.wsUrl
-                        onEditingFinished: aadsClient.wsUrl = text
-                    }
-                }
-
-                RowLayout {
-                    spacing: 12
-                    Label {
-                        text: "SignalK"
-                        color: theme.muted
-                        font.pixelSize: 16
-                        Layout.preferredWidth: 100
-                    }
-                    TextField {
-                        Layout.fillWidth: true
-                        text: aadsClient.signalkUrl
-                        onEditingFinished: aadsClient.signalkUrl = text
-                    }
-                }
-
-                RowLayout {
-                    spacing: 12
-                    Label {
-                        text: "Wiki Path"
-                        color: theme.muted
-                        font.pixelSize: 16
-                        Layout.preferredWidth: 100
-                    }
-                    TextField {
-                        Layout.fillWidth: true
-                        text: uiSettings.wikiPath
-                        onEditingFinished: {
-                            uiSettings.wikiPath = text;
-                            aadsClient.wikiPath = text;
-                            aadsClient.loadWiki();
-                            if (syncProfile) {
-                                syncProfile();
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    radius: theme.radiusSm
-                    color: "transparent"
-                    border.color: theme.grid
-                    border.width: 1
-
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 8
-
-                        Label {
-                            text: "Offline Map (MBTiles)"
-                            color: theme.text
-                            font.pixelSize: 16
-                            font.bold: true
                         }
 
                         RowLayout {
                             spacing: 12
-                            Label { text: "Tile URL"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 120 }
+                            Label { text: qsTr("New / Save"); color: Theme.muted; Layout.preferredWidth: 100 }
                             TextField {
                                 Layout.fillWidth: true
-                                text: uiSettings.localTileUrl
-                                placeholderText: "http://localhost:8080/styles/raster/"
-                                onEditingFinished: {
-                                    uiSettings.localTileUrl = text;
-                                    if (syncProfile) {
-                                        syncProfile();
-                                    }
-                                }
+                                placeholderText: qsTr("e.g. rough-sea")
+                                text: root.newProfileName
+                                onTextChanged: root.newProfileName = text
+                                color: Theme.text
+                                background: Rectangle { color: Theme.bg; border.color: Theme.grid; radius: 4 }
                             }
-                        }
+                            Button {
+                                text: qsTr("Save Current")
+                                onClicked: {
+                                    if (!uiSettings) {
+                                        return;
+                                    }
+                                    var name = root.newProfileName.trim();
+                                    if (name === "") name = uiSettings.currentProfile;
 
-                        RowLayout {
-                            spacing: 12
-                            Label { text: "Track Length"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 120 }
-                            Slider {
-                                Layout.fillWidth: true
-                                from: 50
-                                to: 400
-                                value: uiSettings.trackLength
-                                onValueChanged: {
-                                    uiSettings.trackLength = Math.round(value);
-                                    if (syncProfile) {
-                                        syncProfile();
-                                    }
+                                    var json = ProfileHandler.saveCurrentToProfile(uiSettings, name);
+                                    uiSettings.profilesJson = json;
+
+                                    root.profileList = ProfileHandler.getProfileNames(json);
+                                    uiSettings.currentProfile = name;
+                                    root.newProfileName = "";
                                 }
-                            }
-                            Label {
-                                text: uiSettings.trackLength.toString()
-                                color: theme.text
-                                font.pixelSize: 12
                             }
                         }
                     }
-                }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    radius: theme.radiusSm
-                    color: "transparent"
-                    border.color: theme.grid
-                    border.width: 1
+                    SettingsGroup {
+                        title: qsTr("Connectivity")
 
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 8
+                        SettingRow { label: qsTr("API URL"); value: aadsClient.apiUrl; onEdited: function(txt) { aadsClient.apiUrl = txt; } }
+                        SettingRow { label: qsTr("WS URL"); value: aadsClient.wsUrl; onEdited: function(txt) { aadsClient.wsUrl = txt; } }
+                        SettingRow { label: qsTr("SignalK"); value: aadsClient.signalkUrl; onEdited: function(txt) { aadsClient.signalkUrl = txt; } }
 
-                        Label {
-                            text: "Display Settings"
-                            color: theme.text
-                            font.pixelSize: 16
-                            font.bold: true
-                        }
-
-                        RowLayout {
-                            spacing: 12
-                            Label { text: "Night Mode"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 120 }
-                            Switch { checked: uiSettings.nightMode; onToggled: { uiSettings.nightMode = checked; if (syncProfile) syncProfile(); } }
-                        }
-
-                        RowLayout {
-                            spacing: 12
-                            Label { text: "Show Map"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 120 }
-                            Switch { checked: uiSettings.showMap; onToggled: { uiSettings.showMap = checked; if (syncProfile) syncProfile(); } }
-                        }
-
-                        RowLayout {
-                            spacing: 12
-                            Label { text: "Show Navi"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 120 }
-                            Switch { checked: uiSettings.showNavi; onToggled: { uiSettings.showNavi = checked; if (syncProfile) syncProfile(); } }
-                        }
-
-                        RowLayout {
-                            spacing: 12
-                            Label { text: "Show Compass"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 120 }
-                            Switch { checked: uiSettings.showCompass; onToggled: { uiSettings.showCompass = checked; if (syncProfile) syncProfile(); } }
-                        }
-
-                        RowLayout {
-                            spacing: 12
-                            Label { text: "Show Wind"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 120 }
-                            Switch { checked: uiSettings.showWind; onToggled: { uiSettings.showWind = checked; if (syncProfile) syncProfile(); } }
-                        }
-
-                        RowLayout {
-                            spacing: 12
-                            Label { text: "Show Autopilot"; color: theme.muted; font.pixelSize: 14; Layout.preferredWidth: 120 }
-                            Switch { checked: uiSettings.showAutopilot; onToggled: { uiSettings.showAutopilot = checked; if (syncProfile) syncProfile(); } }
+                        Button {
+                            text: qsTr("Reconnect WebSocket")
+                            Layout.alignment: Qt.AlignRight
+                            onClicked: { aadsClient.disconnectWs(); aadsClient.connectWs(); }
                         }
                     }
-                }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    radius: theme.radiusSm
-                    color: "transparent"
-                    border.color: theme.grid
-                    border.width: 1
-
-                    ColumnLayout {
-                        anchors.fill: parent
-                        anchors.margins: 12
-                        spacing: 8
-
-                        Label {
-                            text: "Gauge Grid"
-                            color: theme.text
-                            font.pixelSize: 16
-                            font.bold: true
-                        }
+                    SettingsGroup {
+                        title: qsTr("Display & Map")
 
                         RowLayout {
-                            spacing: 12
-                            Label { text: "Rows"; color: theme.muted; font.pixelSize: 13; Layout.preferredWidth: 90 }
-                            ComboBox {
-                                model: [2, 3, 4]
-                                currentIndex: model.indexOf(gaugeGrid.rows)
-                                onActivated: {
-                                    if (setGaugeGridSize) {
-                                        setGaugeGridSize(model[currentIndex], gaugeGrid.cols);
+                            Label { text: qsTr("Night Mode"); color: Theme.muted; Layout.fillWidth: true }
+                            Switch {
+                                checked: uiSettings ? uiSettings.nightMode : false
+                                onToggled: {
+                                    if (uiSettings) {
+                                        uiSettings.nightMode = checked;
                                     }
                                 }
                             }
                         }
 
                         RowLayout {
-                            spacing: 12
-                            Label { text: "Columns"; color: theme.muted; font.pixelSize: 13; Layout.preferredWidth: 90 }
-                            ComboBox {
-                                model: [2, 3, 4]
-                                currentIndex: model.indexOf(gaugeGrid.cols)
-                                onActivated: {
-                                    if (setGaugeGridSize) {
-                                        setGaugeGridSize(gaugeGrid.rows, model[currentIndex]);
-                                    }
-                                }
+                            Label { text: qsTr("Red Night Mode"); color: Theme.muted; Layout.fillWidth: true }
+                            Switch {
+                                checked: Theme.redMode
+                                onToggled: Theme.redMode = checked
                             }
                         }
+                        Text {
+                            text: qsTr("Preserves night vision (Red filter)")
+                            color: Theme.muted
+                            font.pixelSize: 10
+                            visible: true
+                        }
 
-                        ScrollView {
+                        SettingRow {
+                            label: qsTr("Tile URL")
+                            value: uiSettings ? uiSettings.localTileUrl : ""
+                            placeholder: qsTr("http://localhost:8080/...")
+                            onEdited: uiSettings ? function(txt) { uiSettings.localTileUrl = txt; } : null
+                        }
+
+                        RowLayout {
+                            Label { text: qsTr("Track Length"); color: Theme.muted; Layout.fillWidth: true }
+                            Label { text: uiSettings ? uiSettings.trackLength : 0; color: Theme.text }
+                        }
+                        Slider {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 240
-                            clip: true
+                            from: 50; to: 500
+                            value: uiSettings ? uiSettings.trackLength : 0
+                            onValueChanged: {
+                                if (uiSettings) {
+                                    uiSettings.trackLength = value;
+                                }
+                            }
+                        }
+                    }
 
-                            ColumnLayout {
-                                width: parent.width
-                                spacing: 8
+                    SettingsGroup {
+                        title: qsTr("Panels")
+                        GridLayout {
+                            columns: 2
+                            rowSpacing: 10
+                            columnSpacing: 20
 
-                                Repeater {
-                                    model: gaugeGrid.cells.length
-                                    delegate: RowLayout {
-                                        spacing: 10
-                                        Label {
-                                            text: "Cell " + (index + 1)
-                                            color: theme.muted
-                                            font.pixelSize: 12
-                                            Layout.preferredWidth: 90
-                                        }
-                                        ComboBox {
-                                            Layout.fillWidth: true
-                                            model: gaugeCatalog
-                                            textRole: "label"
-                                            valueRole: "key"
-                                            currentIndex: gaugeIndexForKey(gaugeGrid.cells[index])
-                                            onActivated: {
-                                                if (setGaugeCell) {
-                                                    setGaugeCell(index, gaugeCatalog[currentIndex].key);
-                                                }
-                                            }
-                                        }
-                                    }
+                            SwitchRow { label: qsTr("Show Map"); checked: uiSettings ? uiSettings.showMap : true; onToggled: uiSettings ? function(val) { uiSettings.showMap = val; } : null }
+                            SwitchRow { label: qsTr("Show Navi"); checked: uiSettings ? uiSettings.showNavi : true; onToggled: uiSettings ? function(val) { uiSettings.showNavi = val; } : null }
+                            SwitchRow { label: qsTr("Show Compass"); checked: uiSettings ? uiSettings.showCompass : true; onToggled: uiSettings ? function(val) { uiSettings.showCompass = val; } : null }
+                            SwitchRow { label: qsTr("Show Wind"); checked: uiSettings ? uiSettings.showWind : true; onToggled: uiSettings ? function(val) { uiSettings.showWind = val; } : null }
+                            SwitchRow { label: qsTr("Show Autopilot"); checked: uiSettings ? uiSettings.showAutopilot : true; onToggled: uiSettings ? function(val) { uiSettings.showAutopilot = val; } : null }
+                        }
+                    }
+
+                    SettingsGroup {
+                        title: qsTr("Dashboard Widgets")
+                        GridLayout {
+                            columns: 2
+                            rowSpacing: 10
+                            columnSpacing: 20
+
+                            SwitchRow { label: qsTr("Speed"); checked: uiSettings ? uiSettings.showSpeed : false; onToggled: uiSettings ? function(val) { uiSettings.showSpeed = val; } : null }
+                            SwitchRow { label: qsTr("Depth"); checked: uiSettings ? uiSettings.showDepth : false; onToggled: uiSettings ? function(val) { uiSettings.showDepth = val; } : null }
+                            SwitchRow { label: qsTr("RPM"); checked: uiSettings ? uiSettings.showRpm : false; onToggled: uiSettings ? function(val) { uiSettings.showRpm = val; } : null }
+                            SwitchRow { label: qsTr("Temp"); checked: uiSettings ? uiSettings.showTemp : false; onToggled: uiSettings ? function(val) { uiSettings.showTemp = val; } : null }
+                            SwitchRow { label: qsTr("Fuel"); checked: uiSettings ? uiSettings.showFuel : false; onToggled: uiSettings ? function(val) { uiSettings.showFuel = val; } : null }
+                            SwitchRow { label: qsTr("Battery"); checked: uiSettings ? uiSettings.showBattery : false; onToggled: uiSettings ? function(val) { uiSettings.showBattery = val; } : null }
+                        }
+                    }
+
+                    SettingsGroup {
+                        title: qsTr("Gauges")
+
+                        RowLayout {
+                            spacing: 12
+                            Label { text: qsTr("Grid"); color: Theme.muted; Layout.preferredWidth: 100 }
+                            SpinBox {
+                                id: rowsSpin
+                                from: 2
+                                to: 4
+                                value: ensureGrid().rows
+                                onValueModified: resizeGrid(value, colsSpin.value)
+                            }
+                            Text { text: "x"; color: Theme.muted }
+                            SpinBox {
+                                id: colsSpin
+                                from: 2
+                                to: 4
+                                value: ensureGrid().cols
+                                onValueModified: resizeGrid(rowsSpin.value, value)
+                            }
+                        }
+
+                        GridLayout {
+                            columns: ensureGrid().cols
+                            rowSpacing: 8
+                            columnSpacing: 8
+                            Layout.fillWidth: true
+
+                            Repeater {
+                                model: ensureGrid().rows * ensureGrid().cols
+                                delegate: ComboBox {
+                                    Layout.fillWidth: true
+                                    model: root.gaugeCatalog
+                                    textRole: "display"
+                                    currentIndex: Logic.gaugeIndexForKey(ensureGrid().cells[index])
+                                    onActivated: function(idx) { setGaugeCell(index, root.gaugeCatalog[idx].key); }
                                 }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
 
-                Button {
-                    text: "Reconnect WebSocket"
-                    onClicked: {
-                        aadsClient.disconnectWs();
-                        aadsClient.connectWs();
-                    }
+    component SettingsGroup : ColumnLayout {
+        property string title: ""
+        spacing: 10
+        Layout.fillWidth: true
+
+        Label { text: title; font.bold: true; color: Theme.text; font.pixelSize: 16 }
+        Rectangle { height: 1; color: Theme.grid; Layout.fillWidth: true }
+    }
+
+    component SettingRow : RowLayout {
+        id: settingRow
+        property string label: ""
+        property string value: ""
+        property string placeholder: ""
+        property var onEdited
+
+        spacing: 12
+        Label { text: label; color: Theme.muted; Layout.preferredWidth: 100 }
+        TextField {
+            Layout.fillWidth: true
+            text: value
+            placeholderText: placeholder
+            color: Theme.text
+            background: Rectangle { color: Theme.bg; border.color: Theme.grid; radius: 4 }
+            onEditingFinished: {
+                if (settingRow.onEdited) {
+                    settingRow.onEdited(text);
+                }
+            }
+        }
+    }
+
+    component SwitchRow : RowLayout {
+        id: switchRow
+        property string label: ""
+        property bool checked: false
+        property var onToggled
+
+        Label { text: label; color: Theme.muted; Layout.fillWidth: true }
+        Switch {
+            checked: switchRow.checked
+            onToggled: {
+                if (switchRow.onToggled) {
+                    switchRow.onToggled(checked);
                 }
             }
         }

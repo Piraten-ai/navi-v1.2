@@ -53,13 +53,14 @@ int main(int argc, char *argv[]) {
     qInstallMessageHandler(logMessage);
     qInfo().noquote() << "AADS UI starting from" << QCoreApplication::applicationDirPath();
 
+    const QString appDir = QCoreApplication::applicationDirPath();
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     QString apiUrl = envOrDefault(env, "AADS_API_URL", "http://localhost:8001");
     QString wsUrl = envOrDefault(env, "AADS_WS_URL", "ws://localhost:8001/ws");
     QString signalkUrl = envOrDefault(env, "AADS_SIGNALK_URL", "http://localhost:3001");
     QString tilesUrl = envOrDefault(env, "AADS_TILES_URL", "http://localhost:8080/styles/raster/");
     QString wikiPath = envOrDefault(env, "AADS_WIKI_PATH", "/opt/aads/docs/current/AADS_WIKI.md");
-    QString logoPath = envOrDefault(env, "AADS_LOGO_PATH", "");
+    QString logoPath = envOrDefault(env, "AADS_LOGO_PATH", QDir(appDir).filePath("logo aasd.png"));
 
     AadsClient client;
     client.setApiUrl(apiUrl);
@@ -68,7 +69,6 @@ int main(int argc, char *argv[]) {
     client.setWikiPath(wikiPath);
 
     QQmlApplicationEngine engine;
-    const QString appDir = QCoreApplication::applicationDirPath();
     engine.addImportPath(appDir);
     engine.addImportPath(QDir(appDir).filePath("qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::warnings, [](const QList<QQmlError> &warnings) {

@@ -126,16 +126,16 @@ function AppContent() {
   }, [ws])
 
   const modules: { id: Module; label: string; icon: string }[] = [
-    { id: 'autonomy', label: 'AUTONOMY', icon: '🤖' },
-    { id: 'dashboard', label: 'DASHBOARD', icon: '📊' },
-    { id: 'map', label: 'MAP', icon: '🗺️' },
-    { id: 'instruments', label: 'BRIDGE', icon: '⚙️' },
-    { id: 'vakten', label: 'VISION', icon: '👁️' },
-    { id: 'navi', label: 'NAVI AI', icon: '💬' },
-    { id: 'navigator', label: 'NAVTEX', icon: '📡' },
-    { id: 'legen', label: 'MEDIC', icon: '⚕️' },
-    { id: 'psykologen', label: 'PSYCH', icon: '🧠' },
-    { id: 'ingenioren', icon: '🔧', label: 'ENGIN' }
+    { id: 'autonomy', label: 'AUTONOMY', icon: 'AU' },
+    { id: 'dashboard', label: 'DASHBOARD', icon: 'DB' },
+    { id: 'map', label: 'MAP', icon: 'MP' },
+    { id: 'instruments', label: 'BRIDGE', icon: 'BR' },
+    { id: 'vakten', label: 'VISION', icon: 'VS' },
+    { id: 'navi', label: 'NAVI AI', icon: 'AI' },
+    { id: 'navigator', label: 'NAVTEX', icon: 'NX' },
+    { id: 'legen', label: 'MEDIC', icon: 'MD' },
+    { id: 'psykologen', label: 'PSYCH', icon: 'PS' },
+    { id: 'ingenioren', icon: 'EN', label: 'ENGIN' }
   ]
 
   const renderModule = () => {
@@ -156,20 +156,21 @@ function AppContent() {
 
   return (
     <div className={`arctic-hud ${battleMode ? 'battle-mode' : ''}`}>
-      {battleMode && <div className="battle-mode-indicator">⚠ BATTLE MODE ACTIVE ⚠</div>}
+      {battleMode && <div className="battle-mode-indicator">BATTLE MODE ACTIVE</div>}
 
       <header className="hud-header-bar">
-        <div className="flex items-center gap-4">
-          <h1 className="text-lg font-black tracking-tighter">AADS PRO <span className="text-xs font-normal opacity-50 ml-2">v4.2.0-JETSON</span></h1>
+        <div className="brand-stack">
+          <h1 className="brand-title">AADS PRO</h1>
+          <span className="brand-sub">v4.2.0-JETSON</span>
         </div>
-        <div className="flex items-center gap-6">
-          <div className="flex gap-4 text-[10px] font-mono">
-            <span className={isConnected ? 'online' : 'offline'}>● BACKEND</span>
-            <span className="online">● NMEA</span>
-            <span className="online">● GPU-ACCEL</span>
+        <div className="header-actions">
+          <div className="status-row">
+            <span className={`status-pill ${isConnected ? 'ok' : 'down'}`}>BACKEND</span>
+            <span className="status-pill ok">NMEA</span>
+            <span className="status-pill ok">GPU ACCEL</span>
           </div>
           <BattleModeToggle enabled={battleMode} onToggle={() => setBattleMode(!battleMode)} />
-          <button className="bg-cyan-500/10 border border-cyan-500/50 px-3 py-1 text-[10px] hover:bg-cyan-500/30" onClick={() => setShowSettings(true)}>⚙ SETTINGS</button>
+          <button className="settings-btn" onClick={() => setShowSettings(true)}>SETTINGS</button>
         </div>
       </header>
 
@@ -186,7 +187,7 @@ function AppContent() {
             <div className="status-item"><span>UPTIME</span><span>04:12:44</span></div>
             <div className="status-item"><span>CPU LOAD</span><span>{hwData.cpu_percent || 0}%</span></div>
             <div className="status-item"><span>MEM USED</span><span>{hwData.memory_percent || 0}%</span></div>
-            <div className="status-item"><span>TEMP</span><span>{hwData.cpu_temp || 42}°C</span></div>
+            <div className="status-item"><span>TEMP</span><span>{hwData.cpu_temp || 42}C</span></div>
           </div>
         </div>
         

@@ -1,131 +1,96 @@
 .pragma library
 
-var gaugeCatalog = [
-    { key: "", label: "(tom)", unit: "", min: 0, max: 1 },
-    { key: "engine.rpm", label: "RPM", unit: "rpm", min: 0, max: 4000 },
-    { key: "engine.temperature", label: "Motortemperatur", unit: "°C", min: 0, max: 120 },
-    { key: "engine.oil_pressure", label: "Oljetrykk", unit: "bar", min: 0, max: 10 },
-    { key: "engine.alternator_voltage", label: "Ladespenning", unit: "V", min: 0, max: 16 },
-    { key: "battery.start.voltage", label: "Batterispenning (start)", unit: "V", min: 0, max: 16 },
-    { key: "battery.house.voltage", label: "Batterispenning (forbruk)", unit: "V", min: 0, max: 16 },
-    { key: "battery.charge_current", label: "LadestrÃ¸m", unit: "A", min: -50, max: 200 },
-    { key: "tanks.fuel.level", label: "DieselnivÃ¥", unit: "%", min: 0, max: 100 },
-    { key: "tanks.freshwater.level", label: "FerskvannsnivÃ¥", unit: "%", min: 0, max: 100 },
-    { key: "tanks.blackwater.level", label: "SeptiknivÃ¥", unit: "%", min: 0, max: 100 },
-    { key: "tanks.greywater.level", label: "GrÃ¥vannsnivÃ¥", unit: "%", min: 0, max: 100 },
-    { key: "nav.depth", label: "Dybde", unit: "m", min: 0, max: 200 },
-    { key: "nav.speed_through_water", label: "Fart gjennom vann", unit: "kn", min: 0, max: 30 },
-    { key: "nav.speed_over_ground", label: "Fart over grunn", unit: "kn", min: 0, max: 30 },
-    { key: "nav.course_over_ground", label: "Kurs over grunn", unit: "°", min: 0, max: 360 },
-    { key: "environment.water.temperature", label: "Vanntemperatur", unit: "°C", min: -5, max: 30 },
-    { key: "environment.air.temperature", label: "Lufttemperatur", unit: "°C", min: -30, max: 40 },
-    { key: "environment.air.humidity", label: "Luftfuktighet", unit: "%", min: 0, max: 100 },
-    { key: "environment.air.pressure", label: "Barometer", unit: "hPa", min: 900, max: 1100 },
-    { key: "environment.wind.speed", label: "Vindhastighet", unit: "kn", min: 0, max: 60 },
-    { key: "environment.wind.angle_apparent", label: "Vindretning (relativ)", unit: "°", min: 0, max: 360 },
-    { key: "environment.wind.angle_true", label: "Vindretning (ekte)", unit: "°", min: 0, max: 360 },
-    { key: "nav.heading", label: "Kompasskurs", unit: "°", min: 0, max: 360 },
-    { key: "navigation.attitude.roll", label: "Krengning", unit: "°", min: -45, max: 45 },
-    { key: "steering.rudder_angle", label: "Rorvinkel", unit: "°", min: -45, max: 45 }
-];
-
-function bridgeValue(client, key, fallback) {
-    var signals = client && client.bridgeSignals ? client.bridgeSignals : [];
-    for (var i = 0; i < signals.length; i++) {
-        if (signals[i].name === key) {
-            return signals[i].value;
-        }
-    }
-    return fallback;
+function formatValue(val, unit) {
+    if (val === undefined || val === null) return "--";
+    var num = Number(val);
+    if (isNaN(num)) return val;
+    var decimals = (unit === "rpm" || unit === "deg" || unit === "pct" || unit === "hPa") ? 0 : 1;
+    return num.toFixed(decimals);
 }
 
-var signalResolvers = {
-    "nav.depth": function(client) {
-        return client.navDepth !== 0 ? client.navDepth : bridgeValue(client, "nav.depth", "--");
-    },
-    "nav.speed_through_water": function(client) {
-        return bridgeValue(client, "nav.speed_through_water", client.navSpeed);
-    },
-    "nav.speed_over_ground": function(client) {
-        return bridgeValue(client, "nav.speed_over_ground", client.navSpeed);
-    },
-    "nav.course_over_ground": function(client) {
-        return bridgeValue(client, "nav.course_over_ground", "--");
-    },
-    "nav.heading": function(client) {
-        return client.navHeading !== 0 ? client.navHeading : bridgeValue(client, "nav.heading", "--");
-    },
-    "environment.wind.speed": function(client) {
-        return bridgeValue(client, "environment.wind.speed", client.navWind);
-    },
-    "environment.wind.angle_apparent": function(client) {
-        return bridgeValue(client, "environment.wind.angle_apparent", bridgeValue(client, "wind_dir", "--"));
-    },
-    "environment.wind.angle_true": function(client) {
-        return bridgeValue(client, "environment.wind.angle_true", bridgeValue(client, "wind_dir_true", "--"));
-    },
-    "environment.air.temperature": function(client) {
-        return bridgeValue(client, "environment.air.temperature", bridgeValue(client, "sense_temp_c", "--"));
-    },
-    "environment.air.humidity": function(client) {
-        return bridgeValue(client, "environment.air.humidity", bridgeValue(client, "sense_humidity_pct", "--"));
-    },
-    "environment.air.pressure": function(client) {
-        return bridgeValue(client, "environment.air.pressure", bridgeValue(client, "sense_pressure_hpa", "--"));
-    },
-    "navigation.attitude.roll": function(client) {
-        return bridgeValue(client, "navigation.attitude.roll", bridgeValue(client, "sense_roll_deg", "--"));
-    },
-    "engine.rpm": function(client) {
-        return bridgeValue(client, "engine.rpm", bridgeValue(client, "rpm", "--"));
-    },
-    "engine.temperature": function(client) {
-        return bridgeValue(client, "engine.temperature", bridgeValue(client, "temp_c", "--"));
-    },
-    "engine.oil_pressure": function(client) {
-        return bridgeValue(client, "engine.oil_pressure", "--");
-    },
-    "engine.alternator_voltage": function(client) {
-        return bridgeValue(client, "engine.alternator_voltage", "--");
-    },
-    "battery.start.voltage": function(client) {
-        return bridgeValue(client, "battery.start.voltage", "--");
-    },
-    "battery.house.voltage": function(client) {
-        return bridgeValue(client, "battery.house.voltage", bridgeValue(client, "battery_voltage", "--"));
-    },
-    "battery.charge_current": function(client) {
-        return bridgeValue(client, "battery.charge_current", bridgeValue(client, "current_a", "--"));
-    },
-    "tanks.fuel.level": function(client) {
-        return bridgeValue(client, "tanks.fuel.level", bridgeValue(client, "fuel_pct", "--"));
-    },
-    "tanks.freshwater.level": function(client) {
-        return bridgeValue(client, "tanks.freshwater.level", "--");
-    },
-    "tanks.blackwater.level": function(client) {
-        return bridgeValue(client, "tanks.blackwater.level", "--");
-    },
-    "tanks.greywater.level": function(client) {
-        return bridgeValue(client, "tanks.greywater.level", "--");
-    },
-    "environment.water.temperature": function(client) {
-        return bridgeValue(client, "environment.water.temperature", "--");
-    },
-    "steering.rudder_angle": function(client) {
-        return bridgeValue(client, "steering.rudder_angle", "--");
-    }
-};
+function normalizeDegrees(val) {
+    var num = Number(val);
+    if (isNaN(num)) return null;
+    var deg = num % 360;
+    return (deg < 0) ? deg + 360 : deg;
+}
 
-function resolveSignal(key, client) {
-    if (!key || key === "") {
-        return "--";
+function cardinalDirection(deg) {
+    var dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+    var idx = Math.round(deg / 45) % 8;
+    return dirs[idx];
+}
+
+function headingText(val) {
+    var deg = normalizeDegrees(val);
+    if (deg === null) return "--";
+    return Math.round(deg) + " deg " + cardinalDirection(deg);
+}
+
+function gaugeText(val, unit) {
+    if (unit === "") return (val === undefined || val === null || val === "") ? "--" : val;
+    return formatValue(val, unit) + " " + displayUnit(unit);
+}
+
+function displayUnit(unit) {
+    if (unit === "pct") return "%";
+    if (unit === "deg") return "deg";
+    if (unit === "C") return "C";
+    return unit;
+}
+
+function isDirectionKey(key) {
+    return key === "nav.heading" ||
+           key === "nav.course_over_ground" ||
+           key === "environment.wind.angle_apparent" ||
+           key === "environment.wind.angle_true";
+}
+
+var gaugeCatalog = [
+    { key: "", category: qsTr("Valg"), label: qsTr("(tom)"), display: qsTr("Valg / (tom)"), unit: "", min: 0, max: 1 },
+
+    { key: "engine.rpm", category: qsTr("Motor"), label: qsTr("RPM"), display: qsTr("Motor / RPM"), unit: "rpm", min: 0, max: 4000 },
+    { key: "engine.temperature", category: qsTr("Motor"), label: qsTr("Motortemp"), display: qsTr("Motor / Motortemp"), unit: "C", min: 0, max: 120 },
+    { key: "engine.oil_pressure", category: qsTr("Motor"), label: qsTr("Oljetrykk"), display: qsTr("Motor / Oljetrykk"), unit: "bar", min: 0, max: 10 },
+    { key: "engine.alternator_voltage", category: qsTr("Motor"), label: qsTr("Ladespenning"), display: qsTr("Motor / Ladespenning"), unit: "V", min: 0, max: 16 },
+
+    { key: "battery.house.voltage", category: qsTr("Batteri"), label: qsTr("Batterispenning"), display: qsTr("Batteri / Batterispenning"), unit: "V", min: 0, max: 16 },
+    { key: "battery.charge_current", category: qsTr("Batteri"), label: qsTr("Ladestrøm"), display: qsTr("Batteri / Ladestrøm"), unit: "A", min: -50, max: 200 },
+
+    { key: "tanks.fuel.level", category: qsTr("Tanker"), label: qsTr("Dieselnivå (%)"), display: qsTr("Tanker / Dieselnivå (%)"), unit: "pct", min: 0, max: 100 },
+    { key: "tanks.fuel.volume", category: qsTr("Tanker"), label: qsTr("Dieselnivå (L)"), display: qsTr("Tanker / Dieselnivå (L)"), unit: "L", min: 0, max: 1000 },
+    { key: "tanks.freshwater.level", category: qsTr("Tanker"), label: qsTr("Ferskvann (%)"), display: qsTr("Tanker / Ferskvann (%)"), unit: "pct", min: 0, max: 100 },
+    { key: "tanks.freshwater.volume", category: qsTr("Tanker"), label: qsTr("Ferskvann (L)"), display: qsTr("Tanker / Ferskvann (L)"), unit: "L", min: 0, max: 1000 },
+    { key: "tanks.blackwater.level", category: qsTr("Tanker"), label: qsTr("Septik (%)"), display: qsTr("Tanker / Septik (%)"), unit: "pct", min: 0, max: 100 },
+    { key: "tanks.blackwater.volume", category: qsTr("Tanker"), label: qsTr("Septik (L)"), display: qsTr("Tanker / Septik (L)"), unit: "L", min: 0, max: 1000 },
+
+    { key: "nav.depth", category: qsTr("Navigasjon"), label: qsTr("Dybde"), display: qsTr("Navigasjon / Dybde"), unit: "m", min: 0, max: 200 },
+    { key: "nav.speed_through_water", category: qsTr("Navigasjon"), label: qsTr("Fart gjennom vann"), display: qsTr("Navigasjon / Fart gjennom vann"), unit: "kn", min: 0, max: 30 },
+    { key: "nav.speed_over_ground", category: qsTr("Navigasjon"), label: qsTr("Fart over grunn"), display: qsTr("Navigasjon / Fart over grunn"), unit: "kn", min: 0, max: 30 },
+    { key: "nav.course_over_ground", category: qsTr("Navigasjon"), label: qsTr("Kurs over grunn"), display: qsTr("Navigasjon / Kurs over grunn"), unit: "deg", min: 0, max: 360 },
+
+    { key: "environment.wind.speed", category: qsTr("Vind"), label: qsTr("Vindhastighet"), display: qsTr("Vind / Vindhastighet"), unit: "kn", min: 0, max: 60 },
+    { key: "environment.wind.angle_apparent", category: qsTr("Vind"), label: qsTr("Vindretning (relativ)"), display: qsTr("Vind / Vindretning (relativ)"), unit: "deg", min: 0, max: 360 },
+    { key: "environment.wind.angle_true", category: qsTr("Vind"), label: qsTr("Vindretning (ekte)"), display: qsTr("Vind / Vindretning (ekte)"), unit: "deg", min: 0, max: 360 },
+
+    { key: "nav.heading", category: qsTr("Retning"), label: qsTr("Kompasskurs"), display: qsTr("Retning / Kompasskurs"), unit: "deg", min: 0, max: 360 },
+    { key: "navigation.attitude.roll", category: qsTr("Retning"), label: qsTr("Krengning / tilt"), display: qsTr("Retning / Krengning / tilt"), unit: "deg", min: -45, max: 45 },
+    { key: "autopilot.rudder_angle", category: qsTr("Retning"), label: qsTr("Rorvinkel"), display: qsTr("Retning / Rorvinkel"), unit: "deg", min: -45, max: 45 },
+
+    { key: "environment.air.temperature", category: qsTr("Miljø"), label: qsTr("Lufttemperatur"), display: qsTr("Miljø / Lufttemperatur"), unit: "C", min: -20, max: 40 },
+    { key: "environment.air.humidity", category: qsTr("Miljø"), label: qsTr("Luftfuktighet"), display: qsTr("Miljø / Luftfuktighet"), unit: "pct", min: 0, max: 100 },
+    { key: "environment.air.pressure", category: qsTr("Miljø"), label: qsTr("Barometer"), display: qsTr("Miljø / Barometer"), unit: "hPa", min: 900, max: 1100 }
+];
+
+function getGaugeMeta(key) {
+    for (var i = 0; i < gaugeCatalog.length; i++) {
+        if (gaugeCatalog[i].key === key) return gaugeCatalog[i];
     }
-    var resolver = signalResolvers[key];
-    if (resolver) {
-        return resolver(client);
-    }
-    return bridgeValue(client, key, "--");
+    return gaugeCatalog[0];
+}
+
+function getCatalog() {
+    return gaugeCatalog;
 }
 
 function gaugeIndexForKey(key) {
@@ -137,11 +102,43 @@ function gaugeIndexForKey(key) {
     return 0;
 }
 
-function gaugeMeta(key) {
-    for (var i = 0; i < gaugeCatalog.length; i++) {
-        if (gaugeCatalog[i].key === key) {
-            return gaugeCatalog[i];
+function resolve(key, client, bridgeSignals) {
+    if (!key) return "--";
+
+    function bv(k, fallback) {
+        if (!bridgeSignals) return fallback;
+        for (var i = 0; i < bridgeSignals.length; i++) {
+            if (bridgeSignals[i].name === k) return bridgeSignals[i].value;
         }
+        return fallback;
     }
-    return gaugeCatalog[0];
+
+    var map = {
+        "nav.depth": function() { return client.navDepth !== 0 ? client.navDepth : bv(key, "--"); },
+        "nav.speed_over_ground": function() { return bv(key, client.navSpeed); },
+        "nav.heading": function() { return client.navHeading !== 0 ? client.navHeading : bv(key, "--"); },
+        "environment.wind.speed": function() { return bv(key, client.navWind); },
+        "environment.wind.angle_true": function() { return bv(key, bv("wind_dir_true", "--")); },
+        "environment.wind.angle_apparent": function() { return bv(key, bv("wind_dir", "--")); },
+        "nav.speed_through_water": function() { return bv(key, client.navSpeed); },
+        "nav.course_over_ground": function() { return bv(key, "--"); },
+        "environment.air.temperature": function() { return bv(key, bv("sense_temp_c", "--")); },
+        "environment.air.humidity": function() { return bv(key, bv("sense_humidity_pct", "--")); },
+        "environment.air.pressure": function() { return bv(key, bv("sense_pressure_hpa", "--")); },
+        "navigation.attitude.roll": function() { return bv(key, bv("sense_roll_deg", "--")); },
+        "engine.rpm": function() { return bv(key, bv("rpm", "--")); },
+        "engine.temperature": function() { return bv(key, bv("temp_c", "--")); },
+        "battery.house.voltage": function() { return bv(key, bv("battery_voltage", "--")); },
+        "battery.charge_current": function() { return bv(key, bv("current_a", "--")); },
+        "tanks.fuel.level": function() { return bv(key, bv("fuel_pct", "--")); },
+        "tanks.fuel.volume": function() { return bv(key, bv("fuel_liters", "--")); },
+        "tanks.freshwater.level": function() { return bv(key, bv("water_pct", "--")); },
+        "tanks.freshwater.volume": function() { return bv(key, bv("water_liters", "--")); },
+        "tanks.blackwater.level": function() { return bv(key, bv("blackwater_pct", "--")); },
+        "tanks.blackwater.volume": function() { return bv(key, bv("blackwater_liters", "--")); },
+        "autopilot.rudder_angle": function() { return bv(key, bv("rudder_deg", "--")); }
+    };
+
+    if (map[key]) return map[key]();
+    return bv(key, "--");
 }

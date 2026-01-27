@@ -25,6 +25,7 @@ import websockets
 from websockets.exceptions import ConnectionClosed
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.core.flight_recorder import recorder
 
 # Optional Redis support
 try:
@@ -34,6 +35,13 @@ except ImportError:
     REDIS_AVAILABLE = False
 
 logger = get_logger(__name__)
+
+
+def _record_metric(key: str, value: float) -> None:
+    try:
+        recorder.log(key, value)
+    except Exception as exc:
+        logger.debug("Flight recorder log failed", extra={"key": key, "error": str(exc)})
 
 
 class SignalKData:
@@ -593,6 +601,11 @@ class SignalKModule:
                     self.current_data.engine_temperature = 82.0 + random.uniform(-2, 2)
                     self.current_data.fuel_level = 75.0 + random.uniform(-1, 1)
 
+                    _record_metric("nav.speed", self.current_data.speed_over_ground)
+                    _record_metric("nav.depth", self.current_data.water_depth)
+                    _record_metric("engine.rpm", self.current_data.engine_rpm)
+                    _record_metric("engine.temp", self.current_data.engine_temperature)
+
                     # Set timestamp with validation
                     self.current_data.set_timestamp(datetime.now(timezone.utc).isoformat())
                     self.current_data.source = "mock"
@@ -704,6 +717,7 @@ class SignalKModule:
                         self.current_data.longitude = val.get("longitude")
                     elif path == "navigation.speedOverGround":
                         self.current_data.speed_over_ground = val * 1.94384  # m/s to knots
+                        _record_metric("nav.speed", self.current_data.speed_over_ground)
                     elif path == "navigation.speedThroughWater":
                         self.current_data.speed_through_water = val * 1.94384
                     elif path == "navigation.courseOverGroundTrue":
@@ -716,6 +730,7 @@ class SignalKModule:
                     # Environment data
                     elif path == "environment.depth.belowTransducer":
                         self.current_data.water_depth = val
+                        _record_metric("nav.depth", self.current_data.water_depth)
                     elif path == "environment.water.temperature":
                         self.current_data.water_temperature = val - 273.15  # Kelvin to Celsius
                     elif path == "environment.wind.speedTrue":
@@ -730,8 +745,10 @@ class SignalKModule:
                     # Propulsion data
                     elif path == "propulsion.main.revolutions":
                         self.current_data.engine_rpm = val * 60  # rev/s to RPM
+                        _record_metric("engine.rpm", self.current_data.engine_rpm)
                     elif path == "propulsion.main.temperature":
                         self.current_data.engine_temperature = val - 273.15
+                        _record_metric("engine.temp", self.current_data.engine_temperature)
                     elif path == "tanks.fuel.0.currentLevel":
                         self.current_data.fuel_level = val * 100  # ratio to percentage
 

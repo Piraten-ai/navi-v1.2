@@ -1,18 +1,23 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQml 2.15
 import QtLocation 6.2
 import QtPositioning 6.2
 import Qt.labs.settings 1.1
 import "components"
+import "utils/ProfileHandler.js" as ProfileHandler
+import "."
 
 ApplicationWindow {
     id: root
     width: 1280
     height: 720
     visible: true
-    title: "AADS Native UI"
+    title: qsTr("AADS Native UI")
     color: "transparent"
+    font.family: Theme.fontBody
+    font.pixelSize: 12
 
     Settings {
         id: uiSettings
@@ -39,8 +44,21 @@ ApplicationWindow {
         property string gaugeGridJson: ""
     }
 
-    Theme { id: theme; nightMode: uiSettings.nightMode }
-    property var themeRef: theme
+    Binding {
+        target: Theme
+        property: "nightMode"
+        value: uiSettings.nightMode
+    }
+
+    Shortcut {
+        sequence: "N"
+        onActivated: {
+            Theme.redMode = !Theme.redMode;
+            if (Theme.redMode) {
+                uiSettings.nightMode = true;
+            }
+        }
+    }
     property var clientRef: aadsClient
 
     property string healthStatus: aadsClient.lastHealthStatus
@@ -49,48 +67,10 @@ ApplicationWindow {
     property bool signalkConnected: aadsClient.signalkConnected
     property var trackPath: []
     property var naviPreview: []
-    property var profileList: []
-    property bool applyingProfile: false
-    property string newProfileName: ""
     property bool showCameraMain: false
     property var gaugeGrid: ({ rows: 3, cols: 3, cells: [] })
-    property var gaugeCatalog: [
-        { key: "", label: "(tom)", unit: "", min: 0, max: 1 },
-        { key: "engine.rpm", label: "RPM", unit: "rpm", min: 0, max: 4000 },
-        { key: "engine.temperature", label: "Motortemperatur", unit: "°C", min: 0, max: 120 },
-        { key: "engine.oil_pressure", label: "Oljetrykk", unit: "bar", min: 0, max: 10 },
-        { key: "engine.alternator_voltage", label: "Ladespenning", unit: "V", min: 0, max: 16 },
-        { key: "battery.start.voltage", label: "Batterispenning (start)", unit: "V", min: 0, max: 16 },
-        { key: "battery.house.voltage", label: "Batterispenning (forbruk)", unit: "V", min: 0, max: 16 },
-        { key: "battery.charge_current", label: "Ladestrøm", unit: "A", min: -50, max: 200 },
-        { key: "tanks.fuel.level", label: "Dieselnivå", unit: "%", min: 0, max: 100 },
-        { key: "tanks.freshwater.level", label: "Ferskvannsnivå", unit: "%", min: 0, max: 100 },
-        { key: "tanks.blackwater.level", label: "Septiknivå", unit: "%", min: 0, max: 100 },
-        { key: "tanks.greywater.level", label: "Gråvannsnivå", unit: "%", min: 0, max: 100 },
-        { key: "nav.depth", label: "Dybde", unit: "m", min: 0, max: 200 },
-        { key: "nav.speed_through_water", label: "Fart gjennom vann", unit: "kn", min: 0, max: 30 },
-        { key: "nav.speed_over_ground", label: "Fart over grunn", unit: "kn", min: 0, max: 30 },
-        { key: "nav.course_over_ground", label: "Kurs over grunn", unit: "°", min: 0, max: 360 },
-        { key: "environment.water.temperature", label: "Vanntemperatur", unit: "°C", min: -5, max: 30 },
-        { key: "environment.air.temperature", label: "Lufttemperatur", unit: "°C", min: -30, max: 40 },
-        { key: "environment.air.humidity", label: "Luftfuktighet", unit: "%", min: 0, max: 100 },
-        { key: "environment.air.pressure", label: "Barometer", unit: "hPa", min: 900, max: 1100 },
-        { key: "environment.wind.speed", label: "Vindhastighet", unit: "kn", min: 0, max: 60 },
-        { key: "environment.wind.angle_apparent", label: "Vindretning (relativ)", unit: "°", min: 0, max: 360 },
-        { key: "environment.wind.angle_true", label: "Vindretning (ekte)", unit: "°", min: 0, max: 360 },
-        { key: "nav.heading", label: "Kompasskurs", unit: "°", min: 0, max: 360 },
-        { key: "navigation.attitude.roll", label: "Krengning", unit: "°", min: -45, max: 45 },
-        { key: "steering.rudder_angle", label: "Rorvinkel", unit: "°", min: -45, max: 45 }
-    ]
-
-    function bridgeValue(key, fallback) {
-        for (var i = 0; i < aadsClient.bridgeSignals.length; i++) {
-            if (aadsClient.bridgeSignals[i].name === key) {
-                return aadsClient.bridgeSignals[i].value;
-            }
-        }
-        return fallback;
-    }
+    property string currentView: "dashboard"
+    property int pollTick: 0
 
     function serviceStatus(name) {
         var services = aadsClient.healthServices || [];
@@ -141,9 +121,6 @@ ApplicationWindow {
             if (trackPath.length > uiSettings.trackLength) {
                 trackPath.shift();
             }
-            if (navMap) {
-                navMap.center = point;
-            }
         }
         function onWikiPathChanged() {
             aadsClient.loadWiki();
@@ -157,96 +134,28 @@ ApplicationWindow {
         }
     }
 
+    Connections {
+        target: uiSettings
+        function onGaugeGridJsonChanged() {
+            applyGaugeGrid(false);
+        }
+    }
+
     Component.onCompleted: {
-        var obj = parseProfiles();
-        if (obj.profiles.indexOf("default") === -1) {
-            obj.profiles.push("default");
-        }
-        if (!obj.data["default"]) {
-            obj.data["default"] = captureSettings();
-        }
-        if (obj.profiles.indexOf("solo-arctic") === -1) {
-            obj.profiles.push("solo-arctic");
-        }
-        if (!obj.data["solo-arctic"]) {
-            obj.data["solo-arctic"] = {
-                nightMode: false,
-                showMap: true,
-                showNavi: true,
-                showCompass: true,
-                showWind: true,
-                showAutopilot: true,
-                mapSource: "local",
-                localTileUrl: uiSettings.localTileUrl,
-                trackLength: 180,
-                wikiPath: uiSettings.wikiPath,
-                showSpeed: true,
-                showDepth: true,
-                showRpm: true,
-                showTemp: true,
-                showFuel: true,
-                showWater: true,
-                showBattery: true,
-                showCurrent: true,
-                gaugeGridJson: ""
-            };
-        }
-        saveProfiles(obj);
         if (!uiSettings.currentProfile || uiSettings.currentProfile === "") {
             uiSettings.currentProfile = "default";
         }
-        applyProfile(uiSettings.currentProfile);
-        applyGaugeGrid();
+        if (uiSettings.profilesJson && uiSettings.profilesJson !== "") {
+            ProfileHandler.applyProfile(uiSettings, aadsClient, uiSettings.currentProfile);
+        }
+        applyGaugeGrid(true);
         updateNaviPreview();
         aadsClient.loadWiki();
     }
-    function formatValue(val, unit) {
-        if (val === undefined || val === null) {
-            return "--";
-        }
-        var num = Number(val);
-        if (isNaN(num)) {
-            return val;
-        }
-        var decimals = 1;
-        if (unit === "rpm" || unit === "°") {
-            decimals = 0;
-        }
-        return num.toFixed(decimals);
-    }
 
-    function gaugeText(val, unit) {
-        if (unit === "") {
-            return val === undefined || val === null || val === "" ? "--" : val;
-        }
-        return formatValue(val, unit) + " " + unit;
-    }
 
-    function normalizeDegrees(val) {
-        var num = Number(val);
-        if (isNaN(num)) {
-            return null;
-        }
-        var deg = num % 360;
-        if (deg < 0) {
-            deg += 360;
-        }
-        return deg;
-    }
 
-    function cardinalDirection(deg) {
-        var dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
-        var idx = Math.round(deg / 45) % 8;
-        return dirs[idx];
-    }
 
-    function headingText(val) {
-        var deg = normalizeDegrees(val);
-        if (deg === null) {
-            return "--";
-        }
-        return Math.round(deg) + "° " + cardinalDirection(deg);
-    }
 
     function defaultGaugeGrid() {
         return {
@@ -261,12 +170,12 @@ ApplicationWindow {
                 "nav.speed_over_ground",
                 "nav.heading",
                 "environment.wind.speed",
-                "environment.wind.angle_true"
+                "environment.air.pressure"
             ]
         };
     }
 
-    function applyGaugeGrid() {
+    function applyGaugeGrid(persist) {
         var grid = null;
         if (uiSettings.gaugeGridJson && uiSettings.gaugeGridJson !== "") {
             try {
@@ -291,7 +200,9 @@ ApplicationWindow {
             grid.cells = grid.cells.slice(0, total);
         }
         gaugeGrid = grid;
-        uiSettings.gaugeGridJson = JSON.stringify(grid);
+        if (persist === undefined || persist) {
+            uiSettings.gaugeGridJson = JSON.stringify(grid);
+        }
     }
 
     function setGaugeGridSize(rows, cols) {
@@ -307,7 +218,6 @@ ApplicationWindow {
         }
         gaugeGrid = grid;
         uiSettings.gaugeGridJson = JSON.stringify(grid);
-        syncProfile();
     }
 
     function setGaugeCell(index, key) {
@@ -318,162 +228,37 @@ ApplicationWindow {
         grid.cells[index] = key;
         gaugeGrid = grid;
         uiSettings.gaugeGridJson = JSON.stringify(grid);
-        syncProfile();
     }
 
-    function gaugeIndexForKey(key) {
-        for (var i = 0; i < gaugeCatalog.length; i++) {
-            if (gaugeCatalog[i].key === key) {
-                return i;
-            }
-        }
-        return 0;
+
+
+
+    function componentForView(view) {
+        if (view === "dashboard") return dashboardComponent;
+        if (view === "bridge") return bridgeComponent;
+        if (view === "navi") return naviComponent;
+        if (view === "wiki") return wikiComponent;
+        if (view === "settings") return settingsComponent;
+        return dashboardComponent;
     }
 
-    function gaugeMeta(key) {
-        for (var i = 0; i < gaugeCatalog.length; i++) {
-            if (gaugeCatalog[i].key === key) {
-                return gaugeCatalog[i];
-            }
-        }
-        return gaugeCatalog[0];
-    }
-
-    function resolveSignal(key) {
-        if (!key || key === "") {
-            return "--";
-        }
-        if (key === "nav.depth") return aadsClient.navDepth !== 0 ? aadsClient.navDepth : bridgeValue(key, "--");
-        if (key === "nav.speed_through_water") return bridgeValue(key, aadsClient.navSpeed);
-        if (key === "nav.speed_over_ground") return bridgeValue(key, aadsClient.navSpeed);
-        if (key === "nav.course_over_ground") return bridgeValue(key, "--");
-        if (key === "nav.heading") return aadsClient.navHeading !== 0 ? aadsClient.navHeading : bridgeValue(key, "--");
-        if (key === "environment.wind.speed") return bridgeValue(key, aadsClient.navWind);
-        if (key === "environment.wind.angle_apparent") return bridgeValue(key, bridgeValue("wind_dir", "--"));
-        if (key === "environment.wind.angle_true") return bridgeValue(key, bridgeValue("wind_dir_true", "--"));
-        if (key === "environment.air.temperature") return bridgeValue(key, bridgeValue("sense_temp_c", "--"));
-        if (key === "environment.air.humidity") return bridgeValue(key, bridgeValue("sense_humidity_pct", "--"));
-        if (key === "environment.air.pressure") return bridgeValue(key, bridgeValue("sense_pressure_hpa", "--"));
-        if (key === "navigation.attitude.roll") return bridgeValue(key, bridgeValue("sense_roll_deg", "--"));
-        if (key === "engine.rpm") return bridgeValue(key, bridgeValue("rpm", "--"));
-        if (key === "engine.temperature") return bridgeValue(key, bridgeValue("temp_c", "--"));
-        if (key === "engine.oil_pressure") return bridgeValue(key, "--");
-        if (key === "engine.alternator_voltage") return bridgeValue(key, "--");
-        if (key === "battery.start.voltage") return bridgeValue(key, "--");
-        if (key === "battery.house.voltage") return bridgeValue(key, bridgeValue("battery_voltage", "--"));
-        if (key === "battery.charge_current") return bridgeValue(key, bridgeValue("current_a", "--"));
-        if (key === "tanks.fuel.level") return bridgeValue(key, bridgeValue("fuel_pct", "--"));
-        if (key === "tanks.freshwater.level") return bridgeValue(key, "--");
-        if (key === "tanks.blackwater.level") return bridgeValue(key, "--");
-        if (key === "tanks.greywater.level") return bridgeValue(key, "--");
-        if (key === "environment.water.temperature") return bridgeValue(key, "--");
-        if (key === "steering.rudder_angle") return bridgeValue(key, "--");
-        return bridgeValue(key, "--");
-    }
-
-    function isDirectionKey(key) {
-        return key === "nav.heading" ||
-               key === "nav.course_over_ground" ||
-               key === "environment.wind.angle_apparent" ||
-               key === "environment.wind.angle_true";
-    }
-
-    function parseProfiles() {
-        if (!uiSettings.profilesJson || uiSettings.profilesJson === "") {
-            return { profiles: ["default"], data: {} };
-        }
-        try {
-            var parsed = JSON.parse(uiSettings.profilesJson);
-            if (!parsed.profiles || !parsed.data) {
-                return { profiles: ["default"], data: {} };
-            }
-            return parsed;
-
-        } catch (e) {
-            return { profiles: ["default"], data: {} };
-        }
-    }
-
-    function saveProfiles(obj) {
-        uiSettings.profilesJson = JSON.stringify(obj);
-        profileList = obj.profiles;
-    }
-
-    function captureSettings() {
-        return {
-            nightMode: uiSettings.nightMode,
-            showMap: uiSettings.showMap,
-            showNavi: uiSettings.showNavi,
-            showCompass: uiSettings.showCompass,
-            showWind: uiSettings.showWind,
-            showAutopilot: uiSettings.showAutopilot,
-            mapSource: uiSettings.mapSource,
-            localTileUrl: uiSettings.localTileUrl,
-            trackLength: uiSettings.trackLength,
-            wikiPath: uiSettings.wikiPath,
-            showSpeed: uiSettings.showSpeed,
-            showDepth: uiSettings.showDepth,
-            showRpm: uiSettings.showRpm,
-            showTemp: uiSettings.showTemp,
-            showFuel: uiSettings.showFuel,
-            showWater: uiSettings.showWater,
-            showBattery: uiSettings.showBattery,
-            showCurrent: uiSettings.showCurrent,
-            gaugeGridJson: uiSettings.gaugeGridJson
-        };
-    }
-
-    function applyProfile(name) {
-        var obj = parseProfiles();
-        var data = obj.data[name];
-        if (!data) {
-            data = captureSettings();
-            obj.data[name] = data;
-            if (obj.profiles.indexOf(name) === -1) {
-                obj.profiles.push(name);
-            }
-            saveProfiles(obj);
-        }
-        applyingProfile = true;
-        uiSettings.currentProfile = name;
-        uiSettings.nightMode = data.nightMode;
-        uiSettings.showMap = data.showMap;
-        uiSettings.showNavi = data.showNavi;
-        uiSettings.showCompass = data.showCompass;
-        uiSettings.showWind = data.showWind;
-        uiSettings.showAutopilot = data.showAutopilot;
-        uiSettings.mapSource = "local";
-        uiSettings.localTileUrl = data.localTileUrl || uiSettings.localTileUrl;
-        uiSettings.trackLength = data.trackLength || 120;
-        uiSettings.wikiPath = data.wikiPath || uiSettings.wikiPath;
-        aadsClient.wikiPath = uiSettings.wikiPath;
-        aadsClient.loadWiki();
-        uiSettings.showSpeed = data.showSpeed;
-        uiSettings.showDepth = data.showDepth;
-        uiSettings.showRpm = data.showRpm;
-        uiSettings.showTemp = data.showTemp;
-        uiSettings.showFuel = data.showFuel;
-        uiSettings.showWater = data.showWater;
-        uiSettings.showBattery = data.showBattery;
-        uiSettings.showCurrent = data.showCurrent;
-        uiSettings.gaugeGridJson = data.gaugeGridJson || uiSettings.gaugeGridJson;
-        applyingProfile = false;
-        syncProfile();
-        applyGaugeGrid();
-    }
-
-    function syncProfile() {
-        if (applyingProfile) {
+    function switchView(view) {
+        if (!view || view === currentView) {
             return;
         }
-        var obj = parseProfiles();
-        var name = uiSettings.currentProfile || "default";
-        if (obj.profiles.indexOf(name) === -1) {
-            obj.profiles.push(name);
+        var component = componentForView(view);
+        if (!component) {
+            return;
         }
-        obj.data[name] = captureSettings();
-        saveProfiles(obj);
+        currentView = view;
+        viewStack.replace(component);
     }
+
+
+
+
+
+
 
     function updateNaviPreview() {
         var history = aadsClient.naviHistory || [];
@@ -487,41 +272,96 @@ ApplicationWindow {
 
     Rectangle {
         anchors.fill: parent
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: theme.bg }
-            GradientStop { position: 0.5; color: theme.bgMid }
-            GradientStop { position: 1.0; color: theme.bgLight }
+        color: Theme.bg
+
+        Rectangle {
+            anchors.fill: parent
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "#050b12" }
+                GradientStop { position: 0.55; color: "#0a1520" }
+                GradientStop { position: 1.0; color: "#07090d" }
+            }
+            opacity: 0.95
+        }
+
+        Rectangle {
+            width: parent.width * 0.65
+            height: parent.height * 0.45
+            radius: 220
+            color: Theme.accent
+            opacity: 0.08
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.margins: -120
+        }
+
+        Rectangle {
+            width: parent.width * 0.55
+            height: parent.height * 0.4
+            radius: 200
+            color: Theme.panelBorder
+            opacity: 0.12
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: -140
+        }
+
+        Canvas {
+            id: gridOverlay
+            anchors.fill: parent
+            opacity: 0.08
+            onPaint: {
+                var ctx = getContext("2d");
+                ctx.clearRect(0, 0, width, height);
+                ctx.strokeStyle = Qt.rgba(Theme.grid.r, Theme.grid.g, Theme.grid.b, 0.25);
+                ctx.lineWidth = 1;
+                var step = 60;
+                for (var x = 0; x < width; x += step) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.stroke();
+                }
+                for (var y = 0; y < height; y += step) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(width, y);
+                    ctx.stroke();
+                }
+            }
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
         }
 
         Rectangle {
             anchors.fill: parent
             color: "transparent"
-            border.color: theme.grid
+            border.color: Theme.grid
             border.width: 1
-            opacity: 0.5
+            opacity: 0.35
         }
 
         Rectangle {
             anchors.fill: parent
             color: "transparent"
-            border.color: theme.grid
+            border.color: Theme.grid
             border.width: 1
-            opacity: 0.25
-            anchors.margins: 24
-            radius: theme.radiusLg
+            opacity: 0.2
+            anchors.margins: 26
+            radius: Theme.radiusLg + 4
         }
 
         ColumnLayout {
             anchors.fill: parent
-            spacing: 14
-            anchors.margins: 18
+            spacing: 16
+            anchors.margins: 20
 
             TopBar {
                 Layout.fillWidth: true
-                theme: themeRef
-                currentView: viewStack.currentView
+                currentView: root.currentView
                 serviceOk: root.serviceOk
-                onViewSelected: function(view) { viewStack.currentView = view }
+                linkOk: aadsClient.wsConnected
+                onViewSelected: function(view) { root.switchView(view) }
             }
 
             RowLayout {
@@ -532,114 +372,19 @@ ApplicationWindow {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    radius: theme.radiusLg
-                    color: theme.panel
-                    border.color: theme.panelEdge
+                    radius: Theme.radiusLg + 2
+                    color: Qt.rgba(Theme.panel.r, Theme.panel.g, Theme.panel.b, Theme.glassOpacity)
+                    border.color: Theme.panelEdge
                     border.width: 1
 
-                    StackLayout {
+                    StackView {
                         id: viewStack
                         anchors.fill: parent
                         anchors.margins: 22
-                        property string currentView: "dashboard"
-
-                        onCurrentViewChanged: {
-                            if (currentView === "dashboard") currentIndex = 0;
-                            else if (currentView === "bridge") currentIndex = 1;
-                            else if (currentView === "navi") currentIndex = 2;
-                            else if (currentView === "wiki") currentIndex = 3;
-                            else if (currentView === "settings") currentIndex = 4;
-                        }
-
-                        DashboardView {
-                            id: dashboardView
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            theme: themeRef
-                            uiSettings: uiSettings
-                            aadsClient: clientRef
-                            aadsLogoPath: aadsLogoPath
-                            trackPath: trackPath
-                            navCoordinate: root.navCoordinate()
-                            showCameraMain: showCameraMain
-                            gaugeGrid: gaugeGrid
-                            gaugeCatalog: gaugeCatalog
-                            gaugeMeta: gaugeMeta
-                            resolveSignal: root.resolveSignal
-                            isDirectionKey: root.isDirectionKey
-                            headingText: root.headingText
-                            normalizeDegrees: root.normalizeDegrees
-                            gaugeText: root.gaugeText
-                            naviPreview: naviPreview
-                            onCameraViewRequested: function(useCamera) { showCameraMain = useCamera }
-                        }
-                        BridgeView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            theme: themeRef
-                            aadsClient: clientRef
-                        }
-
-                        NaviView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            theme: themeRef
-                            aadsClient: clientRef
-                        }
-
-                        WikiView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            theme: themeRef
-                            aadsClient: clientRef
-                        }
-
-                        SettingsView {
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            theme: themeRef
-                            aadsClient: clientRef
-                            uiSettings: uiSettings
-                            profileList: profileList
-                            applyProfile: root.applyProfile
-                            parseProfiles: root.parseProfiles
-                            captureSettings: root.captureSettings
-                            saveProfiles: root.saveProfiles
-                            syncProfile: root.syncProfile
-                            gaugeGrid: gaugeGrid
-                            gaugeCatalog: gaugeCatalog
-                            gaugeIndexForKey: root.gaugeIndexForKey
-                            setGaugeGridSize: root.setGaugeGridSize
-                            setGaugeCell: root.setGaugeCell
-                        }
+                        initialItem: dashboardComponent
                     }
                 }
             }
-        }
-    }
-
-    Timer {
-        interval: 2000
-        repeat: true
-        running: true
-        triggeredOnStart: true
-        onTriggered: {
-            aadsClient.fetchHealth();
-            aadsClient.connectWs();
-        }
-    }
-
-    Timer {
-        interval: 5000
-        repeat: true
-        running: true
-        triggeredOnStart: true
-        onTriggered: {
-            aadsClient.fetchSystemStatus();
-            aadsClient.fetchBridgeLatest();
-            aadsClient.fetchModuleStatuses();
-            aadsClient.fetchNaviHistory(30);
-            aadsClient.fetchNavtexSummary();
         }
     }
 
@@ -649,7 +394,64 @@ ApplicationWindow {
         running: true
         triggeredOnStart: true
         onTriggered: {
+            pollTick += 1;
             aadsClient.fetchSignalKNav();
+            if (pollTick === 1 || pollTick % 2 === 0) {
+                aadsClient.fetchHealth();
+                aadsClient.connectWs();
+            }
+            if (pollTick === 1 || pollTick % 5 === 0) {
+                aadsClient.fetchSystemStatus();
+                aadsClient.fetchBridgeLatest();
+                aadsClient.fetchModuleStatuses();
+                aadsClient.fetchNaviHistory(30);
+                aadsClient.fetchNavtexSummary();
+            }
+        }
+    }
+
+    Component {
+        id: dashboardComponent
+        DashboardView {
+            uiSettings: uiSettings
+            aadsClient: clientRef
+            aadsLogoPath: aadsLogoPath
+            trackPath: trackPath
+            navCoordinate: root.navCoordinate()
+            showCameraMain: showCameraMain
+            gaugeGrid: gaugeGrid
+            naviPreview: naviPreview
+            onCameraViewRequested: function(useCamera) { showCameraMain = useCamera }
+        }
+    }
+
+    Component {
+        id: bridgeComponent
+        BridgeView {
+            aadsClient: clientRef
+        }
+    }
+
+    Component {
+        id: naviComponent
+        NaviView {
+            aadsClient: clientRef
+        }
+    }
+
+    Component {
+        id: wikiComponent
+        WikiView {
+            aadsClient: clientRef
+        }
+    }
+
+    Component {
+        id: settingsComponent
+        SettingsView {
+            aadsClient: clientRef
+            uiSettings: uiSettings
+            gaugeGrid: gaugeGrid
         }
     }
 

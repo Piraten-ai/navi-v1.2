@@ -1,24 +1,58 @@
 import QtQuick 2.15
+pragma Singleton
 
 QtObject {
-    property bool nightMode: false
+    property bool nightMode: true
+    property bool redMode: false
 
-    readonly property color bg: nightMode ? "#120505" : "#07141d"
-    readonly property color bgMid: nightMode ? "#1a0707" : "#0b1a25"
-    readonly property color bgLight: nightMode ? "#240909" : "#0f2230"
-    readonly property color panel: nightMode ? "#1c0a0a" : "#0d1b26"
-    readonly property color panelSoft: nightMode ? "#150808" : "#0a1620"
-    readonly property color accent: nightMode ? "#ff3b3b" : "#49e2ff"
-    readonly property color accentSoft: nightMode ? "#3b0f0f" : "#10343f"
-    readonly property color text: nightMode ? "#ffb3b3" : "#e3f7ff"
-    readonly property color muted: nightMode ? "#b36060" : "#7fa0b4"
-    readonly property color warn: nightMode ? "#ff6b6b" : "#f5b14c"
-    readonly property color danger: nightMode ? "#ff3b3b" : "#f07070"
-    readonly property color glow: nightMode ? "#ff3b3b" : "#1bd4ff"
-    readonly property color ice: nightMode ? "#ff8080" : "#8ad4ff"
-    readonly property color grid: nightMode ? "#3a0f0f" : "#143142"
-    readonly property color panelEdge: nightMode ? "#5a1a1a" : "#1b3a4a"
-    readonly property int radiusLg: 18
+    property FontLoader fontDisplayLoader: FontLoader { source: "qrc:/AadsUi/qml/fonts/Rajdhani-SemiBold.ttf" }
+    property FontLoader fontBodyLoader: FontLoader { source: "qrc:/AadsUi/qml/fonts/SpaceGrotesk.ttf" }
+    property FontLoader fontMonoLoader: FontLoader { source: "qrc:/AadsUi/qml/fonts/JetBrainsMono-Regular.ttf" }
+
+    readonly property string fontDisplay: fontDisplayLoader.name !== "" ? fontDisplayLoader.name : "Sans Serif"
+    readonly property string fontBody: fontBodyLoader.name !== "" ? fontBodyLoader.name : "Sans Serif"
+    readonly property string fontMono: fontMonoLoader.name !== "" ? fontMonoLoader.name : "Monospace"
+
+    readonly property color deepBlack: "#03070c"
+    readonly property color slate: "#0b1420"
+    readonly property color mist: "#162333"
+    readonly property color arcticGlow: "#4fe6ff"
+    readonly property color ionBlue: "#2fc0e6"
+    readonly property color ember: "#f3b43e"
+    readonly property color alertRed: "#ff4d5a"
+    readonly property color mutedText: "#7d9bb1"
+    readonly property color whiteText: "#e7f5ff"
+
+    readonly property color nightBlack: "#040304"
+    readonly property color nightRed: "#b40010"
+    readonly property color dimRed: "#3b0c10"
+
+    readonly property color bg: redMode ? nightBlack : deepBlack
+    readonly property color panel: redMode ? Qt.rgba(0.18, 0.02, 0.04, 0.6) : slate
+    readonly property color panelBorder: redMode ? dimRed : ionBlue
+
+    readonly property color textMain: redMode ? nightRed : whiteText
+    readonly property color textMuted: redMode ? dimRed : mutedText
+
+    readonly property color accent: redMode ? nightRed : arcticGlow
+    readonly property color indicator: redMode ? nightRed : arcticGlow
+    readonly property color danger: alertRed
+
+    readonly property int radiusSm: 6
     readonly property int radiusMd: 12
-    readonly property int radiusSm: 8
+    readonly property int radiusLg: 18
+    readonly property real glassOpacity: redMode ? 0.0 : 0.88
+
+    // Backwards-compatible aliases for existing QML usage
+    readonly property color bgMid: bg
+    readonly property color bgLight: bg
+    readonly property color panelSoft: panel
+    readonly property color accentSoft: accent
+    readonly property color text: textMain
+    readonly property color muted: textMuted
+    readonly property color warn: danger
+    readonly property color glow: accent
+    readonly property color ice: indicator
+    readonly property color grid: mutedText
+    readonly property color panelEdge: panelBorder
 }

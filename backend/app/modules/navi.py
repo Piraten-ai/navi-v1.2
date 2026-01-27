@@ -13,6 +13,7 @@ import os
 import json
 import time
 from app.modules import navigator
+from app.modules.signalk_client import signalk
 
 logger = logging.getLogger(__name__)
 
@@ -391,8 +392,9 @@ RULES:
                 if "threats" in context:
                     context_str += f"Threats: {context['threats']}\n"
 
+            tactical_prompt = self._build_tactical_prompt(user_message)
             messages = [
-                {"role": "system", "content": self.system_prompt},
+                {"role": "system", "content": f"{self.system_prompt}\n\n{tactical_prompt}"},
             ]
 
             # Add recent history
@@ -420,6 +422,49 @@ RULES:
             logger.error(f"Chat error: {e}")
             self.mock_mode = True  # Switch to mock on failure
             return self._mock_response(user_message, context)
+
+    def _build_tactical_prompt(self, user_query: str) -> str:
+        """Build a telemetry-grounded system prompt for tactical responses."""
+        data = signalk.get_data() or {}
+        nav = data.get("navigation", {}) or {}
+        env = data.get("environment", {}) or {}
+
+        def fmt_value(value, fmt: str, unit: str = "") -> str:
+            if value is None:
+                return "DATA UNAVAILABLE"
+            try:
+                return f"{fmt.format(value)}{unit}"
+            except (TypeError, ValueError):
+                return "DATA UNAVAILABLE"
+
+        lat = nav.get("latitude")
+        lon = nav.get("longitude")
+        if lat is None or lon is None:
+            position = "DATA UNAVAILABLE"
+        else:
+            position = f"{lat:.5f}, {lon:.5f}"
+
+        speed = fmt_value(nav.get("speed_over_ground"), "{:.1f}", " kn")
+        heading = fmt_value(nav.get("heading"), "{:.0f}", "°")
+        depth = fmt_value(env.get("water_depth"), "{:.1f}", " m")
+
+        sitrep = (
+            "[SYSTEM TELEMETRY]\n"
+            f"SPEED: {speed}\n"
+            f"HEADING: {heading}\n"
+            f"DEPTH: {depth}\n"
+            f"POSITION: {position}\n"
+            "ALERTS: DATA UNAVAILABLE"
+        )
+
+        system_instruction = (
+            "You are AADS NAVI, an autonomous Arctic ship assistant. "
+            "Your responses must be concise, tactical, and strictly based on the telemetry provided below. "
+            "Do not hallucinate data. If data is missing, state 'DATA UNAVAILABLE'. "
+            "Keep answers under 2 sentences unless detailed analysis is requested."
+        )
+
+        return f"{system_instruction}\n\n{sitrep}\n\nUSER COMMAND: {user_query}"
 
     def _mock_response(self, message: str, context: Optional[Dict]) -> str:
         """Simple rule-based mock responses for when Ollama is offline"""

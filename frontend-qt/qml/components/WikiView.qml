@@ -1,10 +1,10 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import ".."
 
 Item {
     id: root
-    property var theme
     property var aadsClient
 
     ColumnLayout {
@@ -15,14 +15,15 @@ Item {
             Layout.fillWidth: true
             spacing: 12
             Label {
-                text: "Offline Wiki"
-                color: theme.text
+                text: qsTr("Offline Wiki")
+                color: Theme.text
                 font.pixelSize: 24
                 font.bold: true
+                font.family: Theme.fontDisplay
             }
             Item { Layout.fillWidth: true }
             Button {
-                text: "Reload"
+                text: qsTr("Reload")
                 onClicked: aadsClient.loadWiki()
             }
         }
@@ -30,9 +31,9 @@ Item {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: theme.radiusMd
-            color: theme.panelSoft
-            border.color: theme.grid
+            radius: Theme.radiusMd
+            color: Theme.panelSoft
+            border.color: Theme.grid
             border.width: 1
 
             ScrollView {
@@ -42,9 +43,10 @@ Item {
                 Text {
                     width: parent.width
                     text: aadsClient.wikiContent
-                    color: theme.text
+                    color: Theme.text
                     wrapMode: Text.Wrap
                     textFormat: Text.MarkdownText
+                    font.family: Theme.fontBody
                 }
             }
         }

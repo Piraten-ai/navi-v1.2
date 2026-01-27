@@ -58,6 +58,49 @@ Date: 2026-01-25
 - Broke the Qt/QML dashboard into reusable modules (TopBar, MapPanel, GaugePanel).
 - Extracted the remaining QML views (Dashboard/Bridge/Navi/Wiki/Settings) into standalone components.
 
+Date: 2026-01-27
+
+## Completed
+
+- Added QML singleton registration via `qml/qmldir` and aligned imports to the QML root.
+- Moved profile persistence logic into `qml/utils/ProfileHandler.js` and simplified Main.qml startup profile flow.
+- Reworked SettingsView to use ProfileHandler directly with grouped rows and embedded helper components.
+- Updated SignalLogic utilities and trimmed gauge catalog to the focused dashboard set.
+- Rebuilt GaugePanel to use CircularGauge + Logic.resolve with direct aadsClient input.
+- Updated Theme palette to Arctic HUD colors with battleMode and compatibility aliases.
+- Switched CircularGauge to arc-based HUD style and refreshed GaugePanel layout styling.
+- Adjusted Main background gradient to the new dark cyan-to-black backdrop.
+- Added red night-vision mode palette and toggle, plus an N-key shortcut for red mode.
+- Added HUD glow effect on gauge arcs and dynamic header text/animation for night mode.
+- Added HistoryGraph sparkline component and rebuilt NaviView as a tactical chat log.
+- Wired HistoryGraph to live engine temp/RPM data and connected Navi chat to aadsClient history + send.
+- Rebuilt MapPanel for fully offline tiles with red-mode shader filter and HUD coordinates overlay.
+- Mounted FastAPI tileserver for offline maps and ensured tiles directory exists.
+- Added FlightRecorder for in-memory telemetry history plus `/api/v1/history/{sensor_key}` endpoint.
+- Logged key Signal K metrics (speed, depth, RPM, engine temp) into the flight recorder.
+- Injected Signal K telemetry into Navi's tactical system prompt for concise, data-grounded replies.
+- Added thermal zone fallback for Ingenioren CPU temperature readings.
+- Mapped `./map/tiles` into the dev backend container for offline tile serving.
+- Updated Qt CMake QML module list to include new QML/JS files and set QML policies.
+- Removed stale `navMap` reference from Main.qml to prevent runtime errors.
+- Dropped QtGraphicalEffects usage (Glow/imports) to fix missing module crash on Qt 6 builds.
+- Added defensive QML defaults/guards to prevent undefined uiSettings/gaugeGrid runtime warnings.
+- Replaced MapPanel ShaderEffect with a red overlay to avoid Qt6 .qsb shader errors.
+- Removed invalid StackView transition assignments causing QML warnings.
+- Guarded SettingsView/ProfileHandler profile actions when uiSettings is not ready.
+- Expanded SignalLogic gauge catalog with categories/units and added gauge selection UI in Settings.
+- Restored dashboard header cards (logo, compass/wind, autopilot, NAVTEX) and map visibility toggle.
+- Tuned Theme palette for more cohesive Arctic HUD contrast.
+- Adjusted gauge grid persistence to avoid profile defaults overwriting saved settings.
+- Added gauge grid change listener so UI updates immediately when Settings writes gauge JSON.
+- Rebuilt DashboardView layout to match the reference HUD (left column, dual camera row, map overlays, bottom chat, right gauges).
+- Added expanded gauge catalog + categorized display names and grid editor in Settings.
+- Added Qt Multimedia camera wiring in DashboardView with J1455 device selection fallback and dual VideoOutput feeds.
+- Reworked DashboardView layout to match the reference HUD (camera/log top row, map overlays, chat dock, right gauges).
+- Added optional HistoryGraph visibility toggle via GaugePanel showHistory flag (default off).
+- Dropped Qt6MultimediaQuick CMake dependency to match installed Qt modules while keeping QML QtMultimedia runtime.
+- Fixed main.cpp logo path initialization order (appDir before env defaults).
+
 ## Notes
 
 - Bridge endpoint is live; persistence uses InfluxDB when token is configured.

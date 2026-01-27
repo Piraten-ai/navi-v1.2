@@ -28,6 +28,7 @@ services:
       - ./backend/pytest.ini:/app/pytest.ini
       - ./logs:/app/logs
       - ./backend/data:/app/data
+      - ./map/tiles:/app/tiles
       - ./models/piper:/app/models/piper:ro
       - ./audio:/app/audio:ro
     depends_on:
