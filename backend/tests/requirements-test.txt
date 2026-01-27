@@ -16,7 +16,7 @@ starlette==0.36.3
 sqlalchemy==2.0.36
 
 # Mocking and fixtures
-faker==33.1.0  # Generate realistic test data
+faker==40.1.2  # Generate realistic test data
 freezegun==1.5.1  # Mock datetime
 responses==0.25.3  # Mock HTTP requests
 
