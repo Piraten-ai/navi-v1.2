@@ -17,7 +17,11 @@ ApplicationWindow {
     title: qsTr("AADS Native UI")
     color: "transparent"
     font.family: Theme.fontBody
-    font.pixelSize: 12
+    font.pixelSize: Theme.px(12)
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    // Scale UI relative to the design baseline (1280x720), clamped for sanity.
+    readonly property real computedUiScale: clamp(Math.min(width / 1280, height / 720), 0.75, 1.6)
 
     Settings {
         id: uiSettings
@@ -49,6 +53,12 @@ ApplicationWindow {
         target: Theme
         property: "nightMode"
         value: uiSettings.nightMode
+    }
+
+    Binding {
+        target: Theme
+        property: "uiScale"
+        value: root.computedUiScale
     }
 
     Shortcut {
@@ -304,55 +314,10 @@ ApplicationWindow {
             anchors.margins: -140
         }
 
-        Canvas {
-            id: gridOverlay
-            anchors.fill: parent
-            opacity: 0.08
-            onPaint: {
-                var ctx = getContext("2d");
-                ctx.clearRect(0, 0, width, height);
-                ctx.strokeStyle = Qt.rgba(Theme.grid.r, Theme.grid.g, Theme.grid.b, 0.25);
-                ctx.lineWidth = 1;
-                var step = 60;
-                for (var x = 0; x < width; x += step) {
-                    ctx.beginPath();
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, height);
-                    ctx.stroke();
-                }
-                for (var y = 0; y < height; y += step) {
-                    ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    ctx.lineTo(width, y);
-                    ctx.stroke();
-                }
-            }
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            color: "transparent"
-            border.color: Theme.grid
-            border.width: 1
-            opacity: 0.35
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            color: "transparent"
-            border.color: Theme.grid
-            border.width: 1
-            opacity: 0.2
-            anchors.margins: 26
-            radius: Theme.radiusLg + 4
-        }
-
         ColumnLayout {
             anchors.fill: parent
-            spacing: 16
-            anchors.margins: 20
+            spacing: Theme.px(16)
+            anchors.margins: Theme.px(20)
 
             TopBar {
                 Layout.fillWidth: true
@@ -378,7 +343,7 @@ ApplicationWindow {
                     StackView {
                         id: viewStack
                         anchors.fill: parent
-                        anchors.margins: 22
+                        anchors.margins: Theme.px(22)
                         initialItem: dashboardComponent
                     }
                 }

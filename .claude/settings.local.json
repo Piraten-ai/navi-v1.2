@@ -35,7 +35,19 @@
       "Bash(tasklist:*)",
       "Bash(Get-Process)",
       "Bash(Where-Object {$_ProcessName -like \"*ollama*\"})",
-      "Bash(nvidia-smi:*)"
+      "Bash(nvidia-smi:*)",
+      "Bash(if exist build rd /s /q build)",
+      "Bash(cmake:*)",
+      "Bash(where:*)",
+      "Bash(export PATH=\"E:/Qt/Tools/mingw1310_64/bin:E:/Qt/Tools/CMake_64/bin:E:/Qt/Tools/Ninja:$PATH\")",
+      "Bash(export Qt6_DIR=\"E:/Qt/6.10.1/mingw_64\")",
+      "Bash(\"E:/Qt/Tools/Ninja/ninja.exe\")",
+      "Bash(\"E:/Qt/6.10.1/mingw_64/bin/windeployqt.exe\" --qmldir ../qml aads_ui.exe)",
+      "Bash(taskkill:*)",
+      "Bash(start \"\" aads_ui.exe)",
+      "Bash(pip install:*)",
+      "Bash(start cmd:*)",
+      "Bash(./aads_ui.exe:*)"
     ]
   }
 }

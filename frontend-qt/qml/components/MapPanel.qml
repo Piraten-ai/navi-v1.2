@@ -39,18 +39,18 @@ Item {
 
             sourceItem: Item {
                 id: vesselMarker
-                width: 40
-                height: 40
+                width: Theme.px(40)
+                height: Theme.px(40)
 
                 // Outer glow ring
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 36
-                    height: 36
-                    radius: 18
+                    width: Theme.px(36)
+                    height: Theme.px(36)
+                    radius: width / 2
                     color: "transparent"
                     border.color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.3)
-                    border.width: 3
+                    border.width: Math.max(1, Theme.px(3))
 
                     SequentialAnimation on border.color {
                         running: true
@@ -71,8 +71,8 @@ Item {
                 // Vessel shape (boat icon)
                 Canvas {
                     anchors.centerIn: parent
-                    width: 24
-                    height: 32
+                    width: Theme.px(24)
+                    height: Theme.px(32)
 
                     onPaint: {
                         var ctx = getContext("2d");
@@ -138,7 +138,9 @@ Item {
     // Grid overlay
     Canvas {
         anchors.fill: parent
-        opacity: 0.15
+        // Grid overlay tends to make the map look "busy" – keep it off by default.
+        visible: false
+        opacity: 0.08
 
         onPaint: {
             var ctx = getContext("2d");
@@ -171,7 +173,7 @@ Item {
         radius: Theme.radiusSm
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.margins: 10
+            anchors.margins: Theme.px(10)
         width: coordsCol.width + 24
         height: coordsCol.height + 14
         border.color: Theme.panelEdge
@@ -198,7 +200,7 @@ Item {
                           ? root.navCoordinate.latitude.toFixed(5) + "\u00B0N  " + root.navCoordinate.longitude.toFixed(5) + "\u00B0E"
                           : qsTr("NO GPS FIX")
                     color: Theme.textMain
-                    font.pixelSize: 11
+                    font.pixelSize: Theme.px(11)
                     font.family: Theme.fontMono
                     font.bold: true
                 }
@@ -210,14 +212,14 @@ Item {
                 Text {
                     text: qsTr("SOG:")
                     color: Theme.textMuted
-                    font.pixelSize: 9
+                    font.pixelSize: Theme.px(9)
                     font.family: Theme.fontMono
                 }
 
                 Text {
                     text: (aadsClient ? aadsClient.navSpeed.toFixed(1) : "0.0") + " kn"
                     color: Theme.accent
-                    font.pixelSize: 10
+                    font.pixelSize: Theme.px(10)
                     font.family: Theme.fontMono
                     font.bold: true
                 }
@@ -225,14 +227,14 @@ Item {
                 Text {
                     text: qsTr("HDG:")
                     color: Theme.textMuted
-                    font.pixelSize: 9
+                    font.pixelSize: Theme.px(9)
                     font.family: Theme.fontMono
                 }
 
                 Text {
                     text: (aadsClient ? Math.round(aadsClient.navHeading) : "0") + "\u00B0"
                     color: Theme.accent
-                    font.pixelSize: 10
+                    font.pixelSize: Theme.px(10)
                     font.family: Theme.fontMono
                     font.bold: true
                 }
@@ -244,12 +246,12 @@ Item {
     Column {
         anchors.left: parent.left
         anchors.bottom: parent.bottom
-        anchors.margins: 10
-        spacing: 4
+        anchors.margins: Theme.px(10)
+        spacing: Theme.px(4)
 
         Rectangle {
-            width: 32
-            height: 32
+            width: Theme.px(32)
+            height: Theme.px(32)
             radius: 6
             color: Qt.rgba(Theme.panel.r, Theme.panel.g, Theme.panel.b, 0.9)
             border.color: Theme.panelEdge
@@ -258,7 +260,7 @@ Item {
                 anchors.centerIn: parent
                 text: "+"
                 color: Theme.textMain
-                font.pixelSize: 18
+                font.pixelSize: Theme.px(18)
                 font.bold: true
             }
 
@@ -270,8 +272,8 @@ Item {
         }
 
         Rectangle {
-            width: 32
-            height: 32
+            width: Theme.px(32)
+            height: Theme.px(32)
             radius: 6
             color: Qt.rgba(Theme.panel.r, Theme.panel.g, Theme.panel.b, 0.9)
             border.color: Theme.panelEdge
@@ -280,7 +282,7 @@ Item {
                 anchors.centerIn: parent
                 text: "-"
                 color: Theme.textMain
-                font.pixelSize: 18
+                font.pixelSize: Theme.px(18)
                 font.bold: true
             }
 
@@ -296,9 +298,9 @@ Item {
     Rectangle {
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.margins: 10
+        anchors.margins: Theme.px(10)
         width: scaleLabel.width + 16
-        height: 22
+        height: Theme.px(22)
         radius: 4
         color: Qt.rgba(Theme.panel.r, Theme.panel.g, Theme.panel.b, 0.8)
         border.color: Theme.panelEdge
@@ -308,7 +310,7 @@ Item {
             anchors.centerIn: parent
             text: qsTr("ZOOM: ") + Math.round(map.zoomLevel)
             color: Theme.textMuted
-            font.pixelSize: 9
+            font.pixelSize: Theme.px(9)
             font.family: Theme.fontMono
         }
     }
