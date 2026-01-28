@@ -12,6 +12,13 @@ qt_standard_project_setup()
 qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 NEW)
 
+# Ensure Theme is generated/registered as a QML singleton in the module qmldir.
+# Without this, the build-generated `AadsUi/qmldir` registers it as a normal type,
+# and runtime ends up with `Theme` not being a singleton (breaking `Theme.px(...)`, colors, etc).
+set_source_files_properties(qml/Theme.qml PROPERTIES
+    QT_QML_SINGLETON_TYPE TRUE
+)
+
 qt_add_executable(aads_ui
     src/main.cpp
     src/aads_client.cpp
@@ -31,6 +38,7 @@ qt_add_qml_module(aads_ui
         qml/components/StatusLed.qml
         qml/components/CircularGauge.qml
         qml/components/CompassGauge.qml
+        qml/components/WindAutopilotGauge.qml
         qml/components/HistoryGraph.qml
         qml/components/BridgeView.qml
         qml/components/NaviView.qml

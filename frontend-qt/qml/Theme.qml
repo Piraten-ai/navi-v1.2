@@ -4,11 +4,25 @@ pragma Singleton
 QtObject {
     property bool nightMode: true
     property bool redMode: false
+    // Global UI scale. Set from `Main.qml` based on window size.
+    property real uiScale: 1.0
+
+    // Helpers: scale pixels/font sizes consistently.
+    function px(v) {
+        var s = uiScale;
+        if (s === undefined || isNaN(s) || !isFinite(s) || s <= 0) s = 1.0;
+        var out = Math.round(v * s);
+        // Avoid NaN leaking into width/height/margins.
+        if (out === undefined || isNaN(out) || !isFinite(out)) return 0;
+        return out;
+    }
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
     // Font loaders
-    property FontLoader fontDisplayLoader: FontLoader { source: "qrc:/AadsUi/qml/fonts/Rajdhani-SemiBold.ttf" }
-    property FontLoader fontBodyLoader: FontLoader { source: "qrc:/AadsUi/qml/fonts/SpaceGrotesk.ttf" }
-    property FontLoader fontMonoLoader: FontLoader { source: "qrc:/AadsUi/qml/fonts/JetBrainsMono-Regular.ttf" }
+    // Use resolved URLs so this works both from disk and from the QML module resource prefix.
+    property FontLoader fontDisplayLoader: FontLoader { source: Qt.resolvedUrl("fonts/Rajdhani-SemiBold.ttf") }
+    property FontLoader fontBodyLoader: FontLoader { source: Qt.resolvedUrl("fonts/SpaceGrotesk.ttf") }
+    property FontLoader fontMonoLoader: FontLoader { source: Qt.resolvedUrl("fonts/JetBrainsMono-Regular.ttf") }
 
     readonly property string fontDisplay: fontDisplayLoader.name !== "" ? fontDisplayLoader.name : "Sans Serif"
     readonly property string fontBody: fontBodyLoader.name !== "" ? fontBodyLoader.name : "Sans Serif"
@@ -101,6 +115,38 @@ QtObject {
     readonly property int animFast: 150
     readonly property int animNormal: 300
     readonly property int animSlow: 500
+
+    // Neon glow intensities
+    readonly property real neonGlowStrength: 0.8
+    readonly property real neonGlowRadius: 15
+    readonly property real neonPulseMin: 0.4
+    readonly property real neonPulseMax: 1.0
+
+    // 3D/Depth effects
+    readonly property color bevelLight: Qt.rgba(1, 1, 1, 0.15)
+    readonly property color bevelDark: Qt.rgba(0, 0, 0, 0.4)
+    readonly property real depthShadowOffset: 3
+
+    // Glow colors for different states
+    readonly property color glowActive: redMode ? Qt.rgba(1, 0.2, 0.2, 0.8) : Qt.rgba(0.3, 0.9, 1, 0.8)
+    readonly property color glowHover: redMode ? Qt.rgba(1, 0.3, 0.3, 0.5) : Qt.rgba(0.4, 0.95, 1, 0.5)
+    readonly property color glowIdle: redMode ? Qt.rgba(0.6, 0.1, 0.1, 0.3) : Qt.rgba(0.2, 0.7, 0.9, 0.3)
+
+    // Gradient presets for 3D look
+    readonly property var panelGradient: [
+        Qt.rgba(0.08, 0.12, 0.18, 0.95),
+        Qt.rgba(0.04, 0.06, 0.10, 0.98)
+    ]
+
+    readonly property var buttonGradient: [
+        Qt.rgba(0.15, 0.25, 0.35, 0.9),
+        Qt.rgba(0.08, 0.12, 0.18, 0.95)
+    ]
+
+    readonly property var gaugeRingGradient: [
+        Qt.rgba(arcticGlow.r, arcticGlow.g, arcticGlow.b, 0.9),
+        Qt.rgba(ionBlue.r, ionBlue.g, ionBlue.b, 0.4)
+    ]
 
     // Backwards-compatible aliases
     readonly property color text: textMain
