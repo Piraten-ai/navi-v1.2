@@ -41,6 +41,7 @@ ApplicationWindow {
         property bool showWater: true
         property bool showBattery: true
         property bool showCurrent: true
+        property bool showHistoryGraphs: false
         property string gaugeGridJson: ""
     }
 
@@ -160,17 +161,14 @@ ApplicationWindow {
     function defaultGaugeGrid() {
         return {
             rows: 3,
-            cols: 3,
+            cols: 2,
             cells: [
                 "engine.rpm",
-                "engine.temperature",
-                "battery.house.voltage",
-                "tanks.fuel.level",
-                "nav.depth",
-                "nav.speed_over_ground",
-                "nav.heading",
+                "engine.rpm",
                 "environment.wind.speed",
-                "environment.air.pressure"
+                "nav.speed_over_ground",
+                "environment.wind.angle_apparent",
+                "nav.heading"
             ]
         };
     }

@@ -30,6 +30,7 @@ qt_add_qml_module(aads_ui
         qml/components/MapPanel.qml
         qml/components/StatusLed.qml
         qml/components/CircularGauge.qml
+        qml/components/CompassGauge.qml
         qml/components/HistoryGraph.qml
         qml/components/BridgeView.qml
         qml/components/NaviView.qml
