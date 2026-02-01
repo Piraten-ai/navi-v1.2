@@ -102,6 +102,13 @@ class Settings(BaseSettings):
     CAMERA_FPS: int = Field(default=30, ge=1, le=60)
     CAMERA_DEVICE_ID: int = Field(default=0, ge=0, le=10)
 
+    # IP Camera (ONVIF/PTZ)
+    CAMERA_IP: str = Field(default="192.168.39.200", description="IP camera network address")
+    CAMERA_PORT: int = Field(default=8000, ge=1, le=65535, description="ONVIF service port")
+    CAMERA_USER: str = Field(default="admin", description="Camera username")
+    CAMERA_PASS: str = Field(default="admin", description="Camera password")
+    PTZ_ENABLED: bool = Field(default=False, description="Enable PTZ (Pan/Tilt/Zoom) control")
+
     # NMEA GPS Configuration
     NMEA_ENABLED: bool = Field(default=True, description="Enable NMEA GPS data reading")
     NMEA_SERIAL_PORT: str = Field(default="/dev/ttyUSB0", description="Serial port for NMEA GPS device")

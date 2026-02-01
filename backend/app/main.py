@@ -29,6 +29,7 @@ from app.modules.autopilot_telemetry import telemetry_logger
 from app.modules.voice_system import voice_system
 from app.modules.sensehat_display import sensehat_display, FaceExpression
 from app.modules.bridge_logger import BridgeLogger
+from app.modules.ptz_control import PTZController
 
 # Initialize logger
 logger = get_logger(__name__)
@@ -147,6 +148,14 @@ class ConnectionManager:
 # Global connection manager
 connection_manager = ConnectionManager()
 bridge_logger = BridgeLogger()
+
+# PTZ Camera Controller
+ptz_controller = PTZController(
+    camera_ip=settings.CAMERA_IP,
+    camera_port=getattr(settings, 'CAMERA_PORT', 8000),
+    username=getattr(settings, 'CAMERA_USER', 'admin'),
+    password=getattr(settings, 'CAMERA_PASS', 'admin'),
+)
 
 # Latest bridge payload (in-memory)
 last_bridge_payload: dict[str, Any] | None = None
@@ -357,6 +366,18 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"SenseHAT initialization failed: {e}")
 
+        # Initialize PTZ (Pan/Tilt/Zoom) camera control
+        if settings.PTZ_ENABLED:
+            try:
+                ptz_controller.set_broadcast(connection_manager.broadcast)
+                connected = await ptz_controller.connect()
+                if connected:
+                    logger.info("📷 PTZ camera connected - Ready for tracking!")
+                else:
+                    logger.warning(f"PTZ camera connection failed for {settings.CAMERA_IP}")
+            except Exception as e:
+                logger.warning(f"PTZ initialization failed: {e}")
+
         logger.info("All systems initialized")
 
         yield
@@ -402,6 +423,10 @@ async def lifespan(app: FastAPI):
 
         # Close bridge logger
         bridge_logger.close()
+
+        # Disconnect PTZ camera
+        if ptz_controller.connected:
+            await ptz_controller.disconnect()
 
         # Close all WebSocket connections
         try:
@@ -1221,4 +1246,116 @@ async def animate_talking():
         asyncio.create_task(sensehat_display.animate_talking(duration_seconds=3.0))
         return {"status": "ok", "message": "Talking animation started"}
     return {"status": "error", "message": "SenseHAT not available"}, 503
+
+
+# ============================================================================
+# PTZ (Pan/Tilt/Zoom) Camera Endpoints
+# ============================================================================
+
+@app.get(f"{settings.API_PREFIX}/ptz/status", tags=["camera"])
+async def get_ptz_status():
+    """Get current PTZ camera status"""
+    return await ptz_controller.get_status()
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/connect", tags=["camera"])
+async def connect_ptz():
+    """Connect to PTZ camera"""
+    connected = await ptz_controller.connect()
+    return {"status": "connected" if connected else "failed", "camera_ip": settings.CAMERA_IP}
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/disconnect", tags=["camera"])
+async def disconnect_ptz():
+    """Disconnect from PTZ camera"""
+    await ptz_controller.disconnect()
+    return {"status": "disconnected"}
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/pan-left", tags=["camera"])
+async def ptz_pan_left(speed: float = 0.5, duration: float = 1.0):
+    """Pan camera left"""
+    success = await ptz_controller.pan_left(speed=speed, duration_sec=duration)
+    return {"status": "ok" if success else "failed", "action": "pan_left"}
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/pan-right", tags=["camera"])
+async def ptz_pan_right(speed: float = 0.5, duration: float = 1.0):
+    """Pan camera right"""
+    success = await ptz_controller.pan_right(speed=speed, duration_sec=duration)
+    return {"status": "ok" if success else "failed", "action": "pan_right"}
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/tilt-up", tags=["camera"])
+async def ptz_tilt_up(speed: float = 0.5, duration: float = 1.0):
+    """Tilt camera up"""
+    success = await ptz_controller.tilt_up(speed=speed, duration_sec=duration)
+    return {"status": "ok" if success else "failed", "action": "tilt_up"}
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/tilt-down", tags=["camera"])
+async def ptz_tilt_down(speed: float = 0.5, duration: float = 1.0):
+    """Tilt camera down"""
+    success = await ptz_controller.tilt_down(speed=speed, duration_sec=duration)
+    return {"status": "ok" if success else "failed", "action": "tilt_down"}
+
+
+class _PTZAbsoluteMoveReq(BaseModel):
+    pan_deg: float  # -180 to 180
+    tilt_deg: float  # -90 to 90
+    zoom: float = 0.0  # 0.0 to 1.0
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/move", tags=["camera"])
+async def ptz_absolute_move(req: _PTZAbsoluteMoveReq):
+    """Move to absolute position (pan, tilt, zoom)"""
+    success = await ptz_controller.absolute_move(
+        pan_deg=req.pan_deg,
+        tilt_deg=req.tilt_deg,
+        zoom=req.zoom,
+    )
+    return {"status": "ok" if success else "failed", "position": req.__dict__}
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/home", tags=["camera"])
+async def ptz_home():
+    """Move to home position (center, no tilt, no zoom)"""
+    success = await ptz_controller.home()
+    return {"status": "ok" if success else "failed", "action": "home"}
+
+
+class _PTZScanReq(BaseModel):
+    duration_sec: float = 10.0
+    pan_speed: float = 0.3
+    scan_type: str = "sweep"  # sweep, circle, figure8
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/scan", tags=["camera"])
+async def ptz_auto_scan(req: _PTZScanReq):
+    """Start automated scanning pattern"""
+    asyncio.create_task(
+        ptz_controller.auto_scan(
+            duration_sec=req.duration_sec,
+            pan_speed=req.pan_speed,
+            scan_type=req.scan_type,
+        )
+    )
+    return {"status": "ok", "action": "scan_started", "scan_type": req.scan_type}
+
+
+class _PTZTrackReq(BaseModel):
+    bbox: tuple  # (x1, y1, x2, y2)
+    frame_width: int = 1920
+    frame_height: int = 1080
+
+
+@app.post(f"{settings.API_PREFIX}/ptz/track", tags=["camera"])
+async def ptz_track_object(req: _PTZTrackReq):
+    """Track detected object"""
+    success = await ptz_controller.track_object(
+        bbox=req.bbox,
+        frame_width=req.frame_width,
+        frame_height=req.frame_height,
+    )
+    return {"status": "ok" if success else "failed", "action": "tracking"}
 
