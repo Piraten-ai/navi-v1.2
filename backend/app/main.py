@@ -27,6 +27,7 @@ from app.modules.track_control import track
 from app.modules.emergency_behaviors import emergency
 from app.modules.autopilot_telemetry import telemetry_logger
 from app.modules.voice_system import voice_system
+from app.modules.sensehat_display import sensehat_display, FaceExpression
 from app.modules.bridge_logger import BridgeLogger
 
 # Initialize logger
@@ -290,15 +291,32 @@ async def lifespan(app: FastAPI):
         # Configure and start Autopilot controller if enabled
         autopilot_task = None
         try:
+            # Prepare output sinks
+            sinks = []
+            
+            # 1. NMEA 2000 sink
+            from app.modules.nmea2000_autopilot_out import nmea2000_autopilot
+            if nmea2000_autopilot.connect():
+                sinks.append(lambda r: nmea2000_autopilot.send_rudder(r))
+                
+            # 2. NMEA 0183 sink
+            if settings.NMEA0183_OUTPUT_ENABLED:
+                from app.modules.nmea0183_autopilot_out import nmea0183_autopilot
+                if nmea0183_autopilot.connect():
+                    sinks.append(lambda r: nmea0183_autopilot.send_steering(autopilot.state.desired_heading_deg or 0.0))
+            
+            # 3. Bridge/Arduino sink (placeholder if needed)
+            # sinks.append(bridge_logger.log_autopilot)
+
             autopilot.configure(
                 signalk_provider=signalk.get_data,
                 broadcast=connection_manager.broadcast,
-                output_sink=None,
+                output_sinks=sinks,
             )
             if settings.AUTOPILOT_ENABLED:
                 await autopilot.start()
                 autopilot_task = True  # marker
-                logger.info("Autopilot controller initialized")
+                logger.info("Autopilot controller initialized with {} sinks".format(len(sinks)))
                 # Enable telemetry logging if InfluxDB available
                 state_provider = lambda: {
                     **autopilot.get_status(),
@@ -310,7 +328,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Autopilot setup failed: {e}")
 
-        # Initialize voice system if enabled
+        # Initialize voice system - Navi's soul!
         voice_task = None
         if settings.VOICE_ENABLED:
             try:
@@ -321,9 +339,23 @@ async def lifespan(app: FastAPI):
                     **emergency.get_status(),
                 }
                 await voice_system.initialize(state_provider=voice_state_provider)
-                logger.info("Voice system initialized")
+                logger.info("🎙️ Voice system initialized - Navi speaking!")
             except Exception as e:
                 logger.warning(f"Voice system initialization failed: {e}")
+
+        # Initialize SenseHAT display - Navi's face!
+        if sensehat_display.available:
+            try:
+                sensehat_display.configure(broadcast=connection_manager.broadcast)
+                # Start sensor loop
+                asyncio.create_task(sensehat_display.sensor_loop())
+                # Start joystick handler
+                asyncio.create_task(sensehat_display.joystick_input_handler())
+                # Show welcome expression
+                await sensehat_display.set_expression(FaceExpression.HAPPY)
+                logger.info("🎨 SenseHAT display initialized - Navi has a face!")
+            except Exception as e:
+                logger.warning(f"SenseHAT initialization failed: {e}")
 
         logger.info("All systems initialized")
 
@@ -597,10 +629,18 @@ async def websocket_endpoint(websocket: WebSocket):
                         audio_bytes = data.get("audio", [])
                         audio_data = np.array(audio_bytes, dtype=np.int16)
 
+                        # Show thinking expression on SenseHAT
+                        if sensehat_display.available:
+                            await sensehat_display.set_expression(FaceExpression.THINKING)
+
                         # Process voice input
                         command = await voice_system.process_audio(audio_data)
 
                         if command:
+                            # Animate talking on SenseHAT while responding
+                            if sensehat_display.available:
+                                asyncio.create_task(sensehat_display.animate_talking(duration_seconds=2.0))
+
                             # Send voice input and response back to client
                             await connection_manager.broadcast(
                                 {
@@ -609,6 +649,10 @@ async def websocket_endpoint(websocket: WebSocket):
                                     "timestamp": datetime.now(timezone.utc).isoformat(),
                                 }
                             )
+                        else:
+                            # Return to neutral if no command
+                            if sensehat_display.available:
+                                await sensehat_display.set_expression(FaceExpression.NEUTRAL)
                     except Exception as e:
                         logger.error(f"Voice input processing error: {e}")
                         await connection_manager.send_personal(
@@ -619,6 +663,47 @@ async def websocket_endpoint(websocket: WebSocket):
                             },
                             websocket,
                         )
+                elif msg_type == "autopilot":
+                    # Handle autopilot commands from UI
+                    command = data.get("command")
+                    value = data.get("value")
+                    logger.info(f"Autopilot command: {command} ({value})")
+                    
+                    if command == "standby":
+                        autopilot.set_mode("standby")
+                    elif command == "adjust":
+                        autopilot.adjust_heading(float(value))
+                    elif command == "mode":
+                        autopilot.set_mode(str(value))
+                    elif command == "tack":
+                        autopilot.tack(str(value))
+                    elif command == "gybe":
+                        autopilot.gybe(str(value))
+                    elif command == "emergency_stop":
+                        autopilot.emergency_stop()
+                    
+                    # Broadcast status update immediately
+                    await connection_manager.broadcast({
+                        "type": "autopilot_status",
+                        "data": autopilot.get_status(),
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    })
+
+                elif msg_type == "navi_chat":
+                    # Handle AI chat from UI
+                    message = data.get("message")
+                    logger.info(f"Navi Chat: {message}")
+                    
+                    async def process_and_respond(msg):
+                        response = await navi.navi.chat(msg)
+                        await connection_manager.broadcast({
+                            "type": "navi_chat_response",
+                            "message": response,
+                            "timestamp": datetime.now(timezone.utc).isoformat()
+                        })
+                    
+                    asyncio.create_task(process_and_respond(message))
+
                 else:
                     # Echo or log unknown message types
                     logger.debug(f"Received WebSocket message: {msg_type}")
@@ -1065,3 +1150,75 @@ class _AutopilotHeadingReq(BaseModel):
 async def set_autopilot_heading(req: _AutopilotHeadingReq):
     autopilot.set_heading(req.heading_deg)
     return {"status": "ok", "desired_heading_deg": autopilot.get_status().get("desired_heading_deg")}
+
+
+class _AutopilotModeReq(BaseModel):
+    mode: str  # standby, compass, wind, gps
+
+
+@app.post(f"{settings.API_PREFIX}/autopilot/mode", tags=["autopilot"])
+async def set_autopilot_mode(req: _AutopilotModeReq):
+    """Set autopilot mode: standby, compass, wind, gps"""
+    autopilot.set_mode(req.mode)
+    status = autopilot.get_status()
+    return {"status": "ok", "mode": status.get("mode"), "enabled": status.get("enabled")}
+
+
+class _AutopilotAdjustReq(BaseModel):
+    delta_deg: float  # +1, +10, -1, -10
+
+
+@app.post(f"{settings.API_PREFIX}/autopilot/adjust", tags=["autopilot"])
+async def adjust_autopilot_heading(req: _AutopilotAdjustReq):
+    """Adjust heading by delta degrees (for ±1°, ±10° buttons)"""
+    autopilot.adjust_heading(req.delta_deg)
+    return {"status": "ok", "desired_heading_deg": autopilot.get_status().get("desired_heading_deg")}
+
+
+@app.post(f"{settings.API_PREFIX}/autopilot/emergency-stop", tags=["autopilot"])
+async def emergency_stop_autopilot():
+    """Emergency stop - center rudder and standby mode"""
+    autopilot.emergency_stop()
+    if sensehat_display.available:
+        asyncio.create_task(sensehat_display.pulse_alert(duration_seconds=2.0, color="red"))
+    return {"status": "ok", "mode": "standby", "enabled": False}
+
+
+# SenseHAT Endpoints
+@app.get(f"{settings.API_PREFIX}/sensehat/status", tags=["hardware"])
+async def get_sensehat_status():
+    """Get SenseHAT display and sensor status"""
+    return sensehat_display.get_status()
+
+
+class _SenseHATExpressionReq(BaseModel):
+    expression: str  # neutral, happy, talking, thinking, alert, confused
+
+
+@app.post(f"{settings.API_PREFIX}/sensehat/expression", tags=["hardware"])
+async def set_sensehat_expression(req: _SenseHATExpressionReq):
+    """Set Navi's facial expression on LED matrix"""
+    try:
+        expr = FaceExpression[req.expression.upper()]
+        await sensehat_display.set_expression(expr)
+        return {"status": "ok", "expression": expr.value}
+    except KeyError:
+        return {"status": "error", "message": f"Unknown expression: {req.expression}"}, 400
+
+
+@app.post(f"{settings.API_PREFIX}/sensehat/alert", tags=["hardware"])
+async def trigger_sensehat_alert():
+    """Trigger alert pulse on LED matrix"""
+    if sensehat_display.available:
+        asyncio.create_task(sensehat_display.pulse_alert(duration_seconds=2.0, color="red"))
+    return {"status": "ok", "message": "Alert triggered"}
+
+
+@app.post(f"{settings.API_PREFIX}/sensehat/animate-talking", tags=["hardware"])
+async def animate_talking():
+    """Animate talking mouth on LED matrix"""
+    if sensehat_display.available:
+        asyncio.create_task(sensehat_display.animate_talking(duration_seconds=3.0))
+        return {"status": "ok", "message": "Talking animation started"}
+    return {"status": "error", "message": "SenseHAT not available"}, 503
+

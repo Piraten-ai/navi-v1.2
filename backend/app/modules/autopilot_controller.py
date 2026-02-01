@@ -31,6 +31,7 @@ def _wrap_angle(angle_deg: float) -> float:
 @dataclass
 class AutopilotState:
     enabled: bool = False
+    mode: str = "standby"  # standby, compass, wind, gps
     desired_heading_deg: Optional[float] = None
     last_rudder_deg: float = 0.0
     last_update_ts: float = 0.0
@@ -49,7 +50,7 @@ class AutopilotController:
         if settings.WIND_ESTIMATOR_ENABLED:
             self._wind = WindEstimator()
         self._broadcast: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None
-        self._output_sink: Optional[Callable[[float], Awaitable[None] | None]] = None
+        self._output_sinks: list[Callable[[float], Awaitable[None] | None]] = []
         self._signalk_provider: Optional[Callable[[], Dict[str, Any]]] = None
         self._last_step_time: Optional[float] = None
 
@@ -58,11 +59,11 @@ class AutopilotController:
         *,
         signalk_provider: Callable[[], Dict[str, Any]],
         broadcast: Optional[Callable[[Dict[str, Any]], Awaitable[None]]] = None,
-        output_sink: Optional[Callable[[float], Awaitable[None] | None]] = None,
+        output_sinks: Optional[list[Callable[[float], Awaitable[None] | None]]] = None,
     ) -> None:
         self._signalk_provider = signalk_provider
         self._broadcast = broadcast
-        self._output_sink = output_sink
+        self._output_sinks = output_sinks or []
 
     async def start(self) -> None:
         if self._task and not self._task.done():
@@ -86,24 +87,78 @@ class AutopilotController:
 
     def enable(self, desired_heading_deg: Optional[float] = None) -> None:
         self.state.enabled = True
+        if self.state.mode == "standby":
+            self.state.mode = "compass"  # Auto-switch to compass mode when enabling
         if desired_heading_deg is not None:
             self.state.desired_heading_deg = desired_heading_deg % 360.0
         self._pid.reset()
         self._last_step_time = None
-        logger.info("Autopilot enabled", extra={"desired_heading": self.state.desired_heading_deg})
+        logger.info("Autopilot enabled", extra={"desired_heading": self.state.desired_heading_deg, "mode": self.state.mode})
 
     def disable(self) -> None:
         self.state.enabled = False
+        self.state.mode = "standby"
         self.state.last_rudder_deg = 0.0
         logger.info("Autopilot disabled")
+
+    def set_mode(self, mode: str) -> None:
+        """Set autopilot mode: standby, compass, wind, gps"""
+        valid_modes = ["standby", "compass", "wind", "gps"]
+        if mode not in valid_modes:
+            logger.warning(f"Invalid autopilot mode: {mode}")
+            return
+        
+        old_mode = self.state.mode
+        self.state.mode = mode
+        
+        if mode == "standby":
+            self.state.enabled = False
+            self.state.last_rudder_deg = 0.0
+        else:
+            self.state.enabled = True
+            self._pid.reset()
+            self._last_step_time = None
+        
+        logger.info(f"Autopilot mode changed", extra={"old_mode": old_mode, "new_mode": mode})
 
     def set_heading(self, heading_deg: float) -> None:
         self.state.desired_heading_deg = heading_deg % 360.0
         logger.info("Autopilot desired heading updated", extra={"desired_heading": self.state.desired_heading_deg})
 
+    def adjust_heading(self, delta_deg: float) -> None:
+        """Adjust heading by delta degrees (for ±1°, ±10° buttons)"""
+        if self.state.desired_heading_deg is not None:
+            self.state.desired_heading_deg = (self.state.desired_heading_deg + delta_deg) % 360.0
+            logger.info("Autopilot heading adjusted", extra={"delta": delta_deg, "new_heading": self.state.desired_heading_deg})
+
+    def tack(self, side: str) -> None:
+        """Execute tack: shift heading by ~100 degrees"""
+        if self.state.desired_heading_deg is not None:
+            # Shift by 100 degrees to ensure crossing the wind
+            delta = 100.0 if side.lower() == "starboard" else -100.0
+            self.state.desired_heading_deg = (self.state.desired_heading_deg + delta) % 360.0
+            logger.info(f"Tack initiated to {side}", extra={"delta": delta, "new_heading": self.state.desired_heading_deg})
+
+    def gybe(self, side: str) -> None:
+        """Execute gybe: shift heading by ~140 degrees"""
+        if self.state.desired_heading_deg is not None:
+            # Shift by 140 degrees for a deep gybe
+            delta = 140.0 if side.lower() == "starboard" else -140.0
+            self.state.desired_heading_deg = (self.state.desired_heading_deg + delta) % 360.0
+            logger.info(f"Gybe initiated to {side}", extra={"delta": delta, "new_heading": self.state.desired_heading_deg})
+
+    def emergency_stop(self) -> None:
+        """Emergency stop - center rudder and standby"""
+        self.state.enabled = False
+        self.state.mode = "standby"
+        self.state.last_rudder_deg = 0.0
+        self._pid.reset()
+        logger.warning("EMERGENCY STOP activated")
+
     def get_status(self) -> Dict[str, Any]:
         return {
             "enabled": self.state.enabled,
+            "mode": self.state.mode,
             "desired_heading_deg": self.state.desired_heading_deg,
             "last_rudder_deg": self.state.last_rudder_deg,
             "last_update_ts": self.state.last_update_ts,
@@ -143,9 +198,10 @@ class AutopilotController:
                 await self._broadcast(msg)
             except Exception:
                 logger.debug("Broadcast failed (autopilot)")
-        if self._output_sink:
+        
+        for sink in self._output_sinks:
             try:
-                r = self._output_sink(rudder_deg)
+                r = sink(rudder_deg)
                 if asyncio.iscoroutine(r):
                     await r
             except Exception as e:

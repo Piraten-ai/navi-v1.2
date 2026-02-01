@@ -23,23 +23,22 @@ influxdb-client==1.38.0
 minio==7.2.0
 boto3==1.29.7
 
-# AI/ML - Simplified for Jetson/ARM64 compatibility
-ultralytics
-opencv-python-headless
+# Basic ML support (numpy only - heavy ML moved to Jetson)
 numpy<2.0.0
-torch
-torchvision
 
 # Ollama client
 httpx==0.27.2
 aiohttp==3.13.3
 
-# Voice System - Loosened to allow build to find compatible versions
+# Voice System - Navi's soul!
 piper-tts
 openai-whisper
 pygame
 sounddevice
 scipy
+
+# SenseHAT - LED matrix + sensors
+sense-hat
 
 # Logging
 python-json-logger==4.0.0

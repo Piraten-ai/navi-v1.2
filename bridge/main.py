@@ -76,6 +76,18 @@ def serial_reader_loop(label, ser, url):
         post_payload(session, url, message)
 
 
+def serial_heartbeat_loop(ser, interval_s=1.0):
+    """Sends a heartbeat character to the Arduino to prevent failsafe lock-up."""
+    print(f"Bridge heartbeat loop started (Interval: {interval_s}s)")
+    while True:
+        try:
+            ser.write(b'H')
+            ser.flush()
+        except Exception as exc:
+            print(f"Bridge warning: serial heartbeat failed: {exc}")
+        time.sleep(interval_s)
+
+
 def sense_hat_loop(url, interval_s):
     session = requests.Session()
     sense = SenseHat()
@@ -150,9 +162,15 @@ def main():
             print(f"Bridge warning: serial disabled due to error: {exc}")
         else:
             print(f"Bridge serial enabled. Device={serial_device} Baud={serial_baud}")
-            thread = threading.Thread(target=serial_reader_loop, args=("arduino", ser, url), daemon=True)
-            thread.start()
-            threads.append(thread)
+            # Start reader
+            reader_thread = threading.Thread(target=serial_reader_loop, args=("arduino", ser, url), daemon=True)
+            reader_thread.start()
+            threads.append(reader_thread)
+            
+            # Start Heartbeat sender (Crucial for failsafe)
+            heartbeat_thread = threading.Thread(target=serial_heartbeat_loop, args=(ser,), daemon=True)
+            heartbeat_thread.start()
+            threads.append(heartbeat_thread)
 
     if serial_device_2:
         try:

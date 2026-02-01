@@ -1,4 +1,4 @@
-maps/
+cmaps/
 tiles/
 *.mbtiles
 *.kap
@@ -16,7 +16,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/  <-- Commented out because it blocks Flutter's lib/ directory
 lib64/
 parts/
 sdist/
@@ -76,3 +76,35 @@ frontend/yarn-error.log*
 *.swo
 .DS_Store
 .idx/
+
+# --- Flutter & Android ---
+!pocket-controller/lib/
+**/build/
+**/.gradle/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/android/.gradle/
+**/android/app/build/
+**/ios/.gradle/
+**/ios/Pods/
+**/.pub-cache/
+**/.pub/
+
+# --- Gradle & JVM ---
+.gradle/
+build/
+bin/
+*.class
+*.jar
+*.war
+*.ear
+
+# --- OS & IDE ---
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+Thumbs.db

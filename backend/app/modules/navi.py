@@ -1,6 +1,6 @@
 """
 Navi (The Navigator AI) - Conversational AI Module
-Ollama-powered AI assistant for crew support - Doctor, Weather Girl, Anomaly Screamer
+Ollama-powered AI assistant for crew support - Doctor, Weather Girl, alarm
 """
 
 import httpx

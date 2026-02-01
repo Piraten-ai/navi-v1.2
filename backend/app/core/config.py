@@ -111,6 +111,9 @@ class Settings(BaseSettings):
         default=False, description="Use mock NMEA data for testing (False for production with real GPS hardware)"
     )
     NMEA_UPDATE_INTERVAL: float = Field(default=1.0, ge=0.1, le=10.0, description="NMEA data broadcast interval in seconds")
+    NMEA0183_OUTPUT_ENABLED: bool = Field(default=False, description="Enable NMEA 0183 autopilot output")
+    NMEA0183_OUTPUT_PORT: str = Field(default="/dev/ttyUSB1", description="Serial port for NMEA 0183 autopilot output")
+    NMEA0183_OUTPUT_BAUD: int = Field(default=4800, description="Baud rate for NMEA 0183 output")
 
     # NMEA2000 GPS Configuration (CAN bus)
     NMEA2000_ENABLED: bool = Field(default=False, description="Enable NMEA2000 GPS data reading via CAN bus")
